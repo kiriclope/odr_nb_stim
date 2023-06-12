@@ -321,7 +321,7 @@ def correct_sessions(df, task="first", IF_CORRECT=True):
 
     # print("correct", IF_CORRECT)
     if IF_CORRECT:
-        print("perf", np.sum(df.State_code == 7) / df.State_code.shape[0])
+        # print("perf", np.sum(df.State_code == 7) / df.State_code.shape[0])
         correct_df = df[(df.State_code == 7)]
 
     correct_df = correct_df[correct_df.latency != 0]
@@ -380,7 +380,7 @@ def get_drift(theta_out, theta_in, THRESH=30, CUT_OFF=[0]):
     drift[drift < -np.pi] += 2 * np.pi
     drift *= 180 / np.pi
 
-    # drift = drift[np.abs(drift) < THRESH]
+    drift = drift[np.abs(drift) < THRESH]
 
     return drift
 

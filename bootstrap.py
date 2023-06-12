@@ -14,7 +14,43 @@ def bootstrap_parloop(X, statfunc):
 
     return res
 
-def my_boots_ci(X, statfunc=np.nanmean, conf=0.95, n_samples=1000, n_jobs=-1, verbose=1):
+
+def my_boots(X, n_samples=1000, statfunc=np.nanmean, n_jobs=-1, verbose=0):
+    """
+    Bootstrap the conf intervals for a given sample of a population
+    and a statistic.
+    Args:
+        dataset: A list of values, each a sample from an unknown population
+        conf: The conf value (a float between 0 and 1.0)
+        iterations: The number of iterations of resampling to perform
+        sample_size: The sample size for each of the resampled (0 to 1.0
+                     for 0 to 100% of the original data size)
+    statistic: The statistic to use. This must be a function that accepts
+                   a list of values and returns a single value.
+    Returns:
+        Returns the upper and lower values of the conf interval.
+    """
+
+    if verbose:
+        with pgb.tqdm_joblib(
+            pgb.tqdm(desc="bootstrap", total=n_samples)
+        ) as progress_bar:
+            res = Parallel(n_jobs=n_jobs)(
+                delayed(bootstrap_parloop)(X, statfunc) for _ in range(n_samples)
+            )
+    else:
+        res = Parallel(n_jobs=n_jobs)(
+            delayed(bootstrap_parloop)(X, statfunc) for _ in range(n_samples)
+        )
+
+    res = np.asarray(res)
+
+    return res
+
+
+def my_boots_ci(
+    X, statfunc=np.nanmean, conf=0.95, n_samples=1000, n_jobs=-1, verbose=1
+):
     """
     Bootstrap the conf intervals for a given sample of a population
     and a statistic.
