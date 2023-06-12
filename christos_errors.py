@@ -8,13 +8,14 @@ import scipy.stats as stat
 from utils import *
 from bootstrap import my_boots
 
+from bootstrapped import bootstrap as bs
+from bootstrapped import compare_functions as bs_compare
 
-# def f_test(group1, group2):
-#     f = np.nanvar(group1, ddof=1) / np.nanvar(group2, ddof=1)
-#     nun = x.size - 1
-#     dun = y.size - 1
-#     p_value = 1 - scipy.stats.f.cdf(f, nun, dun)
-#     return f, p_value
+from bootstrapped.stats_functions import std
+
+
+def std_ratio(x, y):
+    return np.nanstd(x) - np.nanstd(y)
 
 
 if __name__ == "__main__":
@@ -22,15 +23,18 @@ if __name__ == "__main__":
     THRESH = 30
 
     IF_CORRECT = True
-    CUT_OFF = [np.nan, 0, 45, 90, 180]
+    CUT_OFF = [0, 45, 90, 180, np.nan]
+    CUT_OFF = [180]
 
     monkey = "alone"
     task = "first"
 
     if task == "first":
         trials = np.arange(1, 11)
-    else:
+    elif task == "sec":
         trials = np.arange(11, 21)
+    else:
+        trials = np.arange(1, 21)
 
     drift_off = []
     rad_off = []
@@ -104,10 +108,40 @@ if __name__ == "__main__":
     plt.xlabel("Saccadic Precision (°)")
     # plt.xlim([-THRESH, THRESH])
 
-    # f_value, p_value = stat.f_oneway(diff_off, diff_on)
     # f_value, p_value = f_test(diff_off, diff_on)
-    value, p_value = stat.bartlett(diff_off, diff_on)
-    # value, p_value = stat.levene(diff_off, diff_on, center="mean")
+    value, p_value = stat.levene(diff_off, diff_on, center="mean")
+    print("levene", p_value)
+
+    # n_samples = 1000
+    # boots_off = my_boots(diff_off, n_samples, statfunc=np.nanstd, n_jobs=-1, verbose=0)
+    # boots_on = my_boots(diff_on, n_samples, statfunc=np.nanstd, n_jobs=-1, verbose=0)
+
+    # observed_difference = np.nanstd(diff_off) - np.nanstd(diff_on)
+
+    # # Calculate the difference in the means of the bootstrap samples
+    # bootstrap_differences = boots_off - boots_on
+
+    # p_value = np.sum(abs(bootstrap_differences) >= abs(observed_difference)) / n_samples
+
+    # use bootstrap to estimate the confidence interval using your test statistic
+    result = bs.bootstrap_ab(
+        diff_off,
+        diff_on,
+        stat_func=std,
+        compare_func=bs_compare.difference,
+        num_iterations=10000,
+        alpha=0.05,
+    )
+
+    # calculate p-value
+    p_value = result.p_value
+
+    # print results
+    print("Ratio of standard deviations: {:.2f}".format(result.value))
+    # print("95% confidence interval: ({:.2f}, {:.2f})".format(
+    #     result.lower_bound,
+    # result.upper_bound))
+    print("p-value: {:.3f}".format(p_value))
 
     print("pval", p_value)
     plt.annotate("p = {:.3f}".format(p_value), xy=(0.05, 0.9), xycoords="axes fraction")
