@@ -2,25 +2,32 @@ import numpy as np
 import matplotlib.pyplot as plt
 import scipy.stats as stat
 
-from utils import pal, get_drift_diff_monkey, plot_hist_fit
-
 # from bootstrap import my_boots
 
 from bootstrapped import bootstrap as bs
 from bootstrapped import compare_functions as bs_compare
-from bootstrapped.stats_functions import std
+from bootstrapped.stats_functions import mean, std
+
+from utils import pal, get_drift_diff_monkey, plot_hist_fit
+
+from glm import glm_abs_error
+
+
+def total_error(X, axis=1):
+
+    return np.sqrt(np.mean(X[0] ** 2) + np.mean(X[1] ** 2))
 
 
 if __name__ == "__main__":
 
-    THRESH = 30
+    THRESH = 20
 
-    IF_CORRECT = True
+    IF_CORRECT = False
     CUT_OFF = [0, 45, 90, 180, np.nan]
-    # CUT_OFF = [0, 180, np.nan]
+    # CUT_OFF = [0]
 
     monkey = "alone"
-    task = "sec"
+    task = "first"
 
     if task == "first":
         trials = np.arange(1, 11)
@@ -67,13 +74,18 @@ if __name__ == "__main__":
     drift_on = np.hstack(drift_on)
     diff_on = np.hstack(diff_on)
 
+    if IF_CORRECT:
+        correct = "correct"
+    else:
+        correct = ""
+
     ###################
     # Drift
     ###################
 
-    figname = task + "_exp_" + "error_hist"
-    plot_hist_fit(figname, drift_off, pal[0], THRESH=THRESH, FIT=2)
-    plot_hist_fit(figname, drift_on, pal[1], THRESH=THRESH, FIT=2)
+    figname = task + "_exp_" + correct + "_error_hist"
+    plot_hist_fit(figname, drift_off, pal[0], THRESH=THRESH, FIT=0)
+    plot_hist_fit(figname, drift_on, pal[1], THRESH=THRESH, FIT=0)
     plt.xlabel("Saccadic Accuracy (°)")
 
     plt.vlines(np.nanmean(drift_off), 0, 0.1, color=pal[0], ls="--")
@@ -95,7 +107,7 @@ if __name__ == "__main__":
     # Diffusion
     ###################
 
-    figname = task + "_exp_" + "diff_hist"
+    figname = task + "_exp_" + correct + "_diff_hist"
     plot_hist_fit(figname, diff_off, pal[0], THRESH=THRESH)
     plot_hist_fit(figname, diff_on, pal[1], THRESH=THRESH)
     plt.xlabel("Saccadic Precision (°)")
@@ -109,41 +121,144 @@ if __name__ == "__main__":
     # boots_off = my_boots(diff_off, n_samples, statfunc=np.nanstd, n_jobs=-1, verbose=0)
     # boots_on = my_boots(diff_on, n_samples, statfunc=np.nanstd, n_jobs=-1, verbose=0)
 
-    observed_difference = np.nanstd(np.abs(diff_off)) - np.nanstd(np.abs(diff_on))
+    observed_difference = np.nanmean(np.abs(diff_off)) - np.nanmean(np.abs(diff_on))
 
     # # Calculate the difference in the means of the bootstrap samples
     # bootstrap_differences = boots_off - boots_on
-
-    # p_value = np.sum(abs(bootstrap_differences) >= abs(observed_difference)) / n_samples
 
     # use bootstrap to estimate the confidence interval using your test statistic
     bootstrap_differences = bs.bootstrap_ab(
         np.abs(diff_off),
         np.abs(diff_on),
-        stat_func=std,
+        stat_func=mean,
         compare_func=bs_compare.difference,
         num_iterations=n_samples,
-        scale_test_by=diff_off.shape[0] / diff_on.shape[0],
+        scale_test_by=len(diff_off) / len(diff_on),
         alpha=0.05,
         return_distribution=True,
     )
 
     # calculate p-value
-    p_value = np.sum(abs(bootstrap_differences) >= abs(observed_difference)) / n_samples
+    # p_value = np.sum(abs(bootstrap_differences) >= abs(observed_difference)) / n_samples
+
+    p_value = (
+        2.0
+        * min(
+            np.sum(bootstrap_differences >= observed_difference),
+            np.sum(bootstrap_differences <= observed_difference),
+        )
+        / n_samples
+    )
 
     # print results
-    print("p-value: {:.3f}".format(p_value))
+    print("bootstrapped p-value: {:.3f}".format(p_value))
     plt.annotate("p = {:.3f}".format(p_value), xy=(0.05, 0.9), xycoords="axes fraction")
-
-    plt.savefig(figname + ".svg", dpi=300)
 
     print("bias", np.nanmean(diff_off), np.nanmean(diff_on))
     print("precision", np.nanstd(diff_off), np.nanstd(diff_on))
 
-    # figname = task + "_exp_" + "rad_hist"
-    # plot_hist_fit(figname, rad_off, pal[0], THRESH=THRESH)
-    # plot_hist_fit(figname, rad_on, pal[1], THRESH=THRESH)
-    # plt.xlabel("Saccadic Precision (cm)")
-    # plt.xlim([-THRESH, THRESH])
+    model = glm_abs_error(np.abs(diff_off), np.abs(diff_on))
+    p_value = model.pvalues["condition"]
 
-    # plt.savefig(figname + ".svg", dpi=300)
+    print("glm, p-value: {:.3f}".format(p_value))
+
+    p_value = stat.f.sf(
+        np.var(diff_off, ddof=1) / np.var(diff_on, ddof=1),
+        diff_off.shape[0] - 1,
+        diff_on.shape[0] - 1,
+    )
+
+    print("f test, p-value: {:.3f}".format(p_value))
+
+    if p_value < 0.001:
+        plt.annotate(
+            "p = {:.2e}".format(p_value),
+            xy=(0.6, 0.9),
+            xycoords="axes fraction",
+        )
+    else:
+        plt.annotate(
+            "p = {:.3f}".format(p_value),
+            xy=(0.6, 0.9),
+            xycoords="axes fraction",
+        )
+
+    plt.savefig(figname + ".svg", dpi=300)
+
+    figname = task + "_exp_" + "X_hist"
+    plot_hist_fit(figname, rad_off[0], pal[0], THRESH=THRESH)
+    plot_hist_fit(figname, rad_on[0], pal[1], THRESH=THRESH)
+    plt.xlabel("X Precision")
+    plt.xlim([-THRESH / 15, THRESH / 15])
+
+    bootstrap_differences = bs.bootstrap_ab(
+        np.abs(rad_off[0]),
+        np.abs(rad_on[0]),
+        stat_func=mean,
+        compare_func=bs_compare.difference,
+        num_iterations=n_samples,
+        scale_test_by=len(rad_off[0]) / len(rad_on[0]),
+        alpha=0.05,
+        return_distribution=True,
+    )
+
+    observed_difference = np.nanmean(np.abs(rad_off[0])) - np.nanmean(np.abs(rad_on[0]))
+
+    p_value = (
+        2.0
+        * min(
+            np.sum(bootstrap_differences >= observed_difference),
+            np.sum(bootstrap_differences <= observed_difference),
+        )
+        / n_samples
+    )
+
+    # print results
+    print("bootstrapped p-value: {:.3f}".format(p_value))
+    plt.annotate("p = {:.3f}".format(p_value), xy=(0.05, 0.9), xycoords="axes fraction")
+
+    plt.savefig(figname + ".svg", dpi=300)
+
+    figname = task + "_exp_" + "Y_hist"
+    plot_hist_fit(figname, rad_off[1], pal[0], THRESH=THRESH)
+    plot_hist_fit(figname, rad_on[1], pal[1], THRESH=THRESH)
+    plt.xlabel("Y Precision")
+    plt.xlim([-THRESH / 15, THRESH / 15])
+
+    bootstrap_differences = bs.bootstrap_ab(
+        np.abs(rad_off[1]),
+        np.abs(rad_on[1]),
+        stat_func=mean,
+        compare_func=bs_compare.difference,
+        num_iterations=n_samples,
+        scale_test_by=len(rad_off[0]) / len(rad_on[0]),
+        alpha=0.05,
+        return_distribution=True,
+    )
+
+    observed_difference = np.nanmean(np.abs(rad_off[1])) - np.nanmean(np.abs(rad_on[1]))
+
+    p_value = (
+        2.0
+        * min(
+            np.sum(bootstrap_differences >= observed_difference),
+            np.sum(bootstrap_differences <= observed_difference),
+        )
+        / n_samples
+    )
+
+    # print results
+    print("bootstrapped p-value: {:.3f}".format(p_value))
+    plt.annotate("p = {:.3f}".format(p_value), xy=(0.05, 0.9), xycoords="axes fraction")
+
+    plt.savefig(figname + ".svg", dpi=300)
+
+    figname = task + "_exp_" + "xy_scatter"
+    plt.figure(figname)
+    plt.scatter(rad_off[0], rad_off[1], color=pal[0], alpha=0.25)
+    plt.scatter(rad_on[0], rad_on[1], color=pal[1], alpha=0.25)
+    plt.xlim([-THRESH / 15, THRESH / 15])
+    plt.xlabel("X Precision")
+    plt.ylabel("Y Precision")
+
+    plt.savefig(figname + ".svg", dpi=300)

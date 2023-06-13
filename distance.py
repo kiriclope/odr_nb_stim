@@ -2,8 +2,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import scipy.stats as stat
 
-from utils import *
-from utils import get_drift_diff_monkey
+from utils import pal, get_drift_diff_monkey
 from bootstrapped.bootstrap import bootstrap
 from bootstrapped.stats_functions import mean, std
 
@@ -26,7 +25,7 @@ def fit_lognorm(X):
 
 if __name__ == "__main__":
 
-    THRESH = 20
+    THRESH = 30
     IF_CORRECT = False
     cut_offs = np.array([45, 90, 180])
     n_samples = 10000
@@ -113,12 +112,20 @@ if __name__ == "__main__":
         # ci_off_2 = [boots_off_2.lower_bound, boots_off_2.upper_bound]
 
         boots_off = stat.bootstrap(
-            (drift_off,), statistic=drift_func, n_resamples=n_samples
+            (drift_off,),
+            statistic=drift_func,
+            n_resamples=n_samples,
+            method="Bca",
+            confidence_level=0.95,
         )
         ci_off = boots_off.confidence_interval
 
         boots_off_2 = stat.bootstrap(
-            (diff_off,), statistic=np.nanstd, n_resamples=n_samples
+            (np.abs(diff_off),),
+            statistic=np.nanmean,
+            n_resamples=n_samples,
+            method="Bca",
+            confidence_level=0.95,
         )
         ci_off_2 = boots_off_2.confidence_interval
 
@@ -126,7 +133,9 @@ if __name__ == "__main__":
         # _, ci_off_2 = my_boots_ci(diff_off, n_samples=10000, statfunc=fit_gauss)
 
         mean_drift = np.sqrt(np.nanmean(np.array(drift_off) ** 2))
-        var_diff = np.nanstd(diff_off)
+        var_diff = np.nanmean(np.abs(diff_off))
+
+        # var_diff = np.nanstd(diff_off)
         # var_diff = fit_gauss(diff_off)
 
         drift_D_off.append(mean_drift)
@@ -149,12 +158,20 @@ if __name__ == "__main__":
         # ci_on_2 = [boots_on_2.lower_bound, boots_on_2.upper_bound]
 
         boots_on = stat.bootstrap(
-            (drift_on,), statistic=drift_func, n_resamples=n_samples
+            (drift_on,),
+            statistic=drift_func,
+            n_resamples=n_samples,
+            method="Bca",
+            confidence_level=0.95,
         )
         ci_on = boots_on.confidence_interval
 
         boots_on_2 = stat.bootstrap(
-            (diff_on,), statistic=np.nanstd, n_resamples=n_samples
+            (np.abs(diff_on),),
+            statistic=np.nanmean,
+            n_resamples=n_samples,
+            method="Bca",
+            confidence_level=0.95,
         )
         ci_on_2 = boots_on_2.confidence_interval
 
@@ -167,7 +184,9 @@ if __name__ == "__main__":
         # mean_drift = np.nanmean(drift_on)
         # mean_drift = np.nanmean(np.abs(drift_on))
         mean_drift = np.sqrt(np.nanmean(np.array(drift_on) ** 2))
-        var_diff = np.nanstd(diff_on)
+        var_diff = np.nanmean(np.abs(diff_on))
+
+        # var_diff = np.nanstd(diff_on)
         # var_diff = fit_gauss(diff_on)
 
         drift_D_on.append(mean_drift)

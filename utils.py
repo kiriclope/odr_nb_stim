@@ -103,7 +103,7 @@ def get_drift_diff(
         #     )
 
         if len(thetas_out[i_stim]) != 0:
-            radius.append(radius_out[i_stim] / radius_in[i_stim])
+            radius.append(radius_out[i_stim] - radius_in[i_stim])
             sgn = 1
 
             if np.abs(thetas_in[i_stim][0] - thetas_cue[i_stim][0]) != 0:
@@ -380,14 +380,14 @@ def get_drift(theta_out, theta_in, THRESH=30, CUT_OFF=[0]):
     drift[drift < -np.pi] += 2 * np.pi
     drift *= 180 / np.pi
 
-    drift = drift[np.abs(drift) < THRESH]
+    # drift = drift[np.abs(drift) < THRESH]
 
     return drift
 
 
 def get_diff(theta_out, theta_in, THRESH=30, radius=1):
 
-    diff = (theta_out - theta_in) * radius
+    diff = theta_out - theta_in
 
     diff[diff >= np.pi] -= 2 * np.pi
     diff[diff <= -np.pi] += 2 * np.pi
@@ -403,29 +403,28 @@ def get_diff(theta_out, theta_in, THRESH=30, radius=1):
 
 def get_cov(theta_out, theta_in, rad_out, rad_in, sgn, THRESH=30):
 
-    x_out = rad_out * np.cos(theta_out)
-    y_out = rad_out * np.sin(theta_out)
+    x_out = rad_out / rad_in * np.cos(theta_out)
+    y_out = rad_out / rad_in * np.sin(theta_out)
 
-    x_in = rad_in * np.cos(theta_in)
-    y_in = rad_in * np.sin(theta_in)
+    x_in = np.cos(theta_in)
+    y_in = np.sin(theta_in)
 
     dx = sgn * (x_out - x_in)
     dy = y_out - y_in
 
-    # dx = dx - np.nanmean(dx)
-    # dy = dy - np.nanmean(dy)
+    dx = dx - np.nanmean(dx)
+    dy = dy - np.nanmean(dy)
 
     r, theta = carteToPolar(dx, dy)
 
     theta = theta[np.abs(r) < THRESH]
     r = r[np.abs(r) < THRESH]
 
-    # return r * np.cos(theta) + r * np.sin(theta)
-    # return np.hstack((r * np.cos(theta), r * np.sin(theta)))
-
-    return theta
+    return [r * np.cos(theta), r * np.sin(theta)]
 
 
+# return np.hstack((r * np.cos(theta), r * np.sin(theta)))
+# return theta
 # return theta * 180 / np.pi
 
 
