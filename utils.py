@@ -27,7 +27,7 @@ def plot_hist_fit(figname, X, pal, THRESH=30, FIT=1):
 
     if FIT == 1:
         bins_fit = np.linspace(-THRESH, THRESH, 1000)
-        mu_, sigma_ = stat.norm.fit(X, floc=0)
+        mu_, sigma_ = stat.norm.fit(X)
         fit_ = stat.norm.pdf(bins_fit, mu_, sigma_)
         plt.plot(bins_fit, fit_, color=pal, lw=5)
 

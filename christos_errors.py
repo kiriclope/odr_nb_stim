@@ -1,21 +1,14 @@
-import pandas as pd
 import numpy as np
-import matplotlib
 import matplotlib.pyplot as plt
-import seaborn as sns
 import scipy.stats as stat
 
-from utils import *
-from bootstrap import my_boots
+from utils import pal, get_drift_diff_monkey, plot_hist_fit
+
+# from bootstrap import my_boots
 
 from bootstrapped import bootstrap as bs
 from bootstrapped import compare_functions as bs_compare
-
 from bootstrapped.stats_functions import std
-
-
-def std_ratio(x, y):
-    return np.nanstd(x) - np.nanstd(y)
 
 
 if __name__ == "__main__":
@@ -24,10 +17,10 @@ if __name__ == "__main__":
 
     IF_CORRECT = True
     CUT_OFF = [0, 45, 90, 180, np.nan]
-    CUT_OFF = [180]
+    # CUT_OFF = [0, 180, np.nan]
 
     monkey = "alone"
-    task = "first"
+    task = "sec"
 
     if task == "first":
         trials = np.arange(1, 11)
@@ -112,11 +105,11 @@ if __name__ == "__main__":
     value, p_value = stat.levene(diff_off, diff_on, center="mean")
     print("levene", p_value)
 
-    # n_samples = 1000
+    n_samples = 100000
     # boots_off = my_boots(diff_off, n_samples, statfunc=np.nanstd, n_jobs=-1, verbose=0)
     # boots_on = my_boots(diff_on, n_samples, statfunc=np.nanstd, n_jobs=-1, verbose=0)
 
-    # observed_difference = np.nanstd(diff_off) - np.nanstd(diff_on)
+    observed_difference = np.nanstd(np.abs(diff_off)) - np.nanstd(np.abs(diff_on))
 
     # # Calculate the difference in the means of the bootstrap samples
     # bootstrap_differences = boots_off - boots_on
@@ -124,26 +117,22 @@ if __name__ == "__main__":
     # p_value = np.sum(abs(bootstrap_differences) >= abs(observed_difference)) / n_samples
 
     # use bootstrap to estimate the confidence interval using your test statistic
-    result = bs.bootstrap_ab(
-        diff_off,
-        diff_on,
+    bootstrap_differences = bs.bootstrap_ab(
+        np.abs(diff_off),
+        np.abs(diff_on),
         stat_func=std,
         compare_func=bs_compare.difference,
-        num_iterations=10000,
+        num_iterations=n_samples,
+        scale_test_by=diff_off.shape[0] / diff_on.shape[0],
         alpha=0.05,
+        return_distribution=True,
     )
 
     # calculate p-value
-    p_value = result.p_value
+    p_value = np.sum(abs(bootstrap_differences) >= abs(observed_difference)) / n_samples
 
     # print results
-    print("Ratio of standard deviations: {:.2f}".format(result.value))
-    # print("95% confidence interval: ({:.2f}, {:.2f})".format(
-    #     result.lower_bound,
-    # result.upper_bound))
     print("p-value: {:.3f}".format(p_value))
-
-    print("pval", p_value)
     plt.annotate("p = {:.3f}".format(p_value), xy=(0.05, 0.9), xycoords="axes fraction")
 
     plt.savefig(figname + ".svg", dpi=300)
@@ -151,10 +140,10 @@ if __name__ == "__main__":
     print("bias", np.nanmean(diff_off), np.nanmean(diff_on))
     print("precision", np.nanstd(diff_off), np.nanstd(diff_on))
 
-    figname = task + "_exp_" + "rad_hist"
-    plot_hist_fit(figname, rad_off, pal[0], THRESH=THRESH)
-    plot_hist_fit(figname, rad_on, pal[1], THRESH=THRESH)
-    plt.xlabel("Saccadic Precision (cm)")
-    plt.xlim([-THRESH, THRESH])
+    # figname = task + "_exp_" + "rad_hist"
+    # plot_hist_fit(figname, rad_off, pal[0], THRESH=THRESH)
+    # plot_hist_fit(figname, rad_on, pal[1], THRESH=THRESH)
+    # plt.xlabel("Saccadic Precision (cm)")
+    # plt.xlim([-THRESH, THRESH])
 
-    plt.savefig(figname + ".svg", dpi=300)
+    # plt.savefig(figname + ".svg", dpi=300)

@@ -1,12 +1,17 @@
-import matplotlib
-import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
-import seaborn as sns
 import scipy.stats as stat
 
-from bootstrap import my_boots_ci
 from utils import *
+from utils import get_drift_diff_monkey
+from bootstrapped.bootstrap import bootstrap
+from bootstrapped.stats_functions import mean, std
+
+# from bootstrap import my_boots_ci
+
+
+def drift_func(x, axis=0):
+    return np.sqrt(np.nanmean(np.array(x) ** 2, axis))
 
 
 def fit_gauss(X):
@@ -21,17 +26,20 @@ def fit_lognorm(X):
 
 if __name__ == "__main__":
 
-    THRESH = 30
+    THRESH = 20
     IF_CORRECT = False
     cut_offs = np.array([45, 90, 180])
+    n_samples = 10000
 
     monkey = "alone"
     task = "first"
 
     if task == "first":
-        trials = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+        trials = np.arange(1, 11)
+    elif task == "sec":
+        trials = np.arange(11, 21)
     else:
-        trials = [11, 12, 13, 14, 15, 16, 17, 18, 19, 20]
+        trials = np.arange(1, 21)
 
     drift_D_off = []
     diff_D_off = []
@@ -87,78 +95,86 @@ if __name__ == "__main__":
         drift_on = np.hstack(drift_on)
         diff_on = np.hstack(diff_on)
 
-        print(
-            "distance",
-            cut_offs[i_cut],
-            "drift_off",
-            drift_off.shape,
-            "diff_off",
-            diff_off.shape,
+        # _, ci_off = my_boots_ci(
+        #     drift_off, n_samples=10000, statfunc=lambda x: np.sqrt(np.nanmean(x**2))
+        # )
+
+        # boots_off = bootstrap(
+        #     drift_off,
+        #     stat_func=mean,
+        #     alpha=0.05,
+        #     num_iterations=n_samples,
+        # )
+        # ci_off = [boots_off.lower_bound, boots_off.upper_bound]
+
+        # boots_off_2 = bootstrap(
+        #     diff_off, stat_func=std, alpha=0.05, num_iterations=n_samples
+        # )
+        # ci_off_2 = [boots_off_2.lower_bound, boots_off_2.upper_bound]
+
+        boots_off = stat.bootstrap(
+            (drift_off,), statistic=drift_func, n_resamples=n_samples
         )
+        ci_off = boots_off.confidence_interval
 
-        # _, ci_off = my_boots_ci(drift_off, n_samples=10000, statfunc=np.nanmean)
-        # _, ci_off = my_boots_ci(np.abs(drift_off), n_samples=10000, statfunc=np.nanmean)
-        _, ci_off = my_boots_ci(
-            drift_off, n_samples=10000, statfunc=lambda x: np.sqrt(np.nanmean(x**2))
+        boots_off_2 = stat.bootstrap(
+            (diff_off,), statistic=np.nanstd, n_resamples=n_samples
         )
+        ci_off_2 = boots_off_2.confidence_interval
 
-        # _, ci_off = my_boots_ci(drift_off, n_samples=10000, statfunc=lambda x: np.sqrt(np.nanmean(x**2)))
-
-        _, ci_off_2 = my_boots_ci(diff_off, n_samples=10000, statfunc=np.nanstd)
+        # _, ci_off_2 = my_boots_ci(diff_off, n_samples=10000, statfunc=np.nanstd)
         # _, ci_off_2 = my_boots_ci(diff_off, n_samples=10000, statfunc=fit_gauss)
 
-        # mean_drift = np.nanmean(drift_off)
-        # mean_drift = np.nanmean(np.abs(drift_off))
-        mean_drift = np.sqrt(np.nanmean(drift_off**2))
-
+        mean_drift = np.sqrt(np.nanmean(np.array(drift_off) ** 2))
         var_diff = np.nanstd(diff_off)
         # var_diff = fit_gauss(diff_off)
 
         drift_D_off.append(mean_drift)
         diff_D_off.append(var_diff)
 
-        ci_drift_off.append(ci_off[0])
-        ci_diff_off.append(ci_off_2[0])
+        ci_drift_off.append(ci_off)
+        ci_diff_off.append(ci_off_2)
 
-        print(
-            "distance",
-            cut_offs[i_cut],
-            "drift_on",
-            drift_on.shape,
-            "diff_on",
-            diff_on.shape,
+        # boots_on = bootstrap(
+        #     drift_on,
+        #     stat_func=mean,
+        #     alpha=0.05,
+        #     num_iterations=n_samples,
+        # )
+        # ci_on = [boots_on.lower_bound, boots_on.upper_bound]
+
+        # boots_on_2 = bootstrap(
+        #     diff_on, stat_func=std, alpha=0.05, num_iterations=n_samples
+        # )
+        # ci_on_2 = [boots_on_2.lower_bound, boots_on_2.upper_bound]
+
+        boots_on = stat.bootstrap(
+            (drift_on,), statistic=drift_func, n_resamples=n_samples
         )
+        ci_on = boots_on.confidence_interval
 
-        # _, ci_on = my_boots_ci(drift_on, n_samples=10000, statfunc=np.nanmean)
-        # _, ci_on = my_boots_ci(np.abs(drift_on), n_samples=10000, statfunc=np.nanmean)
-        _, ci_on = my_boots_ci(
-            drift_on, n_samples=10000, statfunc=lambda x: np.sqrt(np.nanmean(x**2))
+        boots_on_2 = stat.bootstrap(
+            (diff_on,), statistic=np.nanstd, n_resamples=n_samples
         )
+        ci_on_2 = boots_on_2.confidence_interval
 
-        _, ci_on_2 = my_boots_ci(diff_on, n_samples=10000, statfunc=np.nanstd)
+        # _, ci_on = my_boots_ci(
+        #     drift_on, n_samples=10000, statfunc=lambda x: np.sqrt(np.nanmean(x**2))
+        # )
+        # _, ci_on_2 = my_boots_ci(diff_on, n_samples=10000, statfunc=np.nanstd)
         # _, ci_on_2 = my_boots_ci(diff_on, n_samples=10000, statfunc=fit_gauss)
-
-        print(
-            "distance",
-            cut_offs[i_cut],
-            "drift_on",
-            drift_on.shape,
-            "diff_on",
-            diff_on.shape,
-        )
 
         # mean_drift = np.nanmean(drift_on)
         # mean_drift = np.nanmean(np.abs(drift_on))
-        mean_drift = np.sqrt(np.nanmean(drift_off**2))
-
+        mean_drift = np.sqrt(np.nanmean(np.array(drift_on) ** 2))
         var_diff = np.nanstd(diff_on)
         # var_diff = fit_gauss(diff_on)
 
         drift_D_on.append(mean_drift)
         diff_D_on.append(var_diff)
 
-        ci_drift_on.append(ci_on[0])
-        ci_diff_on.append(ci_on_2[0])
+        ci_drift_on.append(ci_on)
+        ci_diff_on.append(ci_on_2)
 
     diff_D_off = np.array(diff_D_off)
     drift_D_off = np.array(drift_D_off)
