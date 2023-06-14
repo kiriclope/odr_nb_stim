@@ -2,10 +2,8 @@ import numpy as np
 import matplotlib.pyplot as plt
 import scipy.stats as stat
 
-# from bootstrap import my_boots
+from bootstrap import my_boots_compare, my_perm_test
 
-from bootstrapped import bootstrap as bs
-from bootstrapped import compare_functions as bs_compare
 from bootstrapped.stats_functions import mean, std
 
 from utils import pal, get_drift_diff_monkey, plot_hist_fit
@@ -13,21 +11,26 @@ from utils import pal, get_drift_diff_monkey, plot_hist_fit
 from glm import glm_abs_error
 
 
-def total_error(X, axis=1):
+def statistic(x, y, axis):
+    return np.mean(x**2, axis=axis) * x.shape[-1] / y.shape[-1] - np.mean(
+        y**2, axis=axis
+    )
 
-    return np.sqrt(np.mean(X[0] ** 2) + np.mean(X[1] ** 2))
+
+def dispersion(x):
+    return np.mean(x[0] ** 2) + np.mean(x[1] ** 2)
 
 
 if __name__ == "__main__":
 
     THRESH = 20
 
-    IF_CORRECT = False
+    IF_CORRECT = True
     CUT_OFF = [0, 45, 90, 180, np.nan]
-    # CUT_OFF = [0]
+    # CUT_OFF = [180]
 
     monkey = "alone"
-    task = "first"
+    task = "sec"
 
     if task == "first":
         trials = np.arange(1, 11)
@@ -113,152 +116,95 @@ if __name__ == "__main__":
     plt.xlabel("Saccadic Precision (°)")
     # plt.xlim([-THRESH, THRESH])
 
-    # f_value, p_value = f_test(diff_off, diff_on)
-    value, p_value = stat.levene(diff_off, diff_on, center="mean")
-    print("levene", p_value)
-
     n_samples = 100000
-    # boots_off = my_boots(diff_off, n_samples, statfunc=np.nanstd, n_jobs=-1, verbose=0)
-    # boots_on = my_boots(diff_on, n_samples, statfunc=np.nanstd, n_jobs=-1, verbose=0)
-
-    observed_difference = np.nanmean(np.abs(diff_off)) - np.nanmean(np.abs(diff_on))
-
-    # # Calculate the difference in the means of the bootstrap samples
-    # bootstrap_differences = boots_off - boots_on
-
-    # use bootstrap to estimate the confidence interval using your test statistic
-    bootstrap_differences = bs.bootstrap_ab(
+    p_value = my_boots_compare(
         np.abs(diff_off),
         np.abs(diff_on),
-        stat_func=mean,
-        compare_func=bs_compare.difference,
-        num_iterations=n_samples,
+        n_samples,
+        statfunc=np.mean,
+        alternative="one-sided",
         scale_test_by=len(diff_off) / len(diff_on),
-        alpha=0.05,
-        return_distribution=True,
     )
 
-    # calculate p-value
-    # p_value = np.sum(abs(bootstrap_differences) >= abs(observed_difference)) / n_samples
-
-    p_value = (
-        2.0
-        * min(
-            np.sum(bootstrap_differences >= observed_difference),
-            np.sum(bootstrap_differences <= observed_difference),
-        )
-        / n_samples
-    )
-
-    # print results
     print("bootstrapped p-value: {:.3f}".format(p_value))
     plt.annotate("p = {:.3f}".format(p_value), xy=(0.05, 0.9), xycoords="axes fraction")
 
-    print("bias", np.nanmean(diff_off), np.nanmean(diff_on))
-    print("precision", np.nanstd(diff_off), np.nanstd(diff_on))
-
-    model = glm_abs_error(np.abs(diff_off), np.abs(diff_on))
-    p_value = model.pvalues["condition"]
-
-    print("glm, p-value: {:.3f}".format(p_value))
-
-    p_value = stat.f.sf(
-        np.var(diff_off, ddof=1) / np.var(diff_on, ddof=1),
-        diff_off.shape[0] - 1,
-        diff_on.shape[0] - 1,
+    perm_test = stat.permutation_test(
+        (np.abs(diff_off), np.abs(diff_on)),
+        statistic,
+        n_resamples=n_samples,
+        alternative="greater",
     )
 
-    print("f test, p-value: {:.3f}".format(p_value))
-
-    if p_value < 0.001:
+    print("permutation p-value: {:.3f}".format(perm_test.pvalue))
+    if perm_test.pvalue < 0.001:
         plt.annotate(
-            "p = {:.2e}".format(p_value),
-            xy=(0.6, 0.9),
+            "p = {:.2e}".format(perm_test.pvalue),
+            xy=(0.65, 0.9),
             xycoords="axes fraction",
         )
     else:
         plt.annotate(
-            "p = {:.3f}".format(p_value),
-            xy=(0.6, 0.9),
+            "p = {:.3f}".format(perm_test.pvalue),
+            xy=(0.65, 0.9),
             xycoords="axes fraction",
         )
 
     plt.savefig(figname + ".svg", dpi=300)
 
-    figname = task + "_exp_" + "X_hist"
+    figname = task + "_exp_" + correct + "_X_hist"
     plot_hist_fit(figname, rad_off[0], pal[0], THRESH=THRESH)
     plot_hist_fit(figname, rad_on[0], pal[1], THRESH=THRESH)
     plt.xlabel("X Precision")
     plt.xlim([-THRESH / 15, THRESH / 15])
-
-    bootstrap_differences = bs.bootstrap_ab(
-        np.abs(rad_off[0]),
-        np.abs(rad_on[0]),
-        stat_func=mean,
-        compare_func=bs_compare.difference,
-        num_iterations=n_samples,
-        scale_test_by=len(rad_off[0]) / len(rad_on[0]),
-        alpha=0.05,
-        return_distribution=True,
-    )
-
-    observed_difference = np.nanmean(np.abs(rad_off[0])) - np.nanmean(np.abs(rad_on[0]))
-
-    p_value = (
-        2.0
-        * min(
-            np.sum(bootstrap_differences >= observed_difference),
-            np.sum(bootstrap_differences <= observed_difference),
-        )
-        / n_samples
-    )
-
-    # print results
-    print("bootstrapped p-value: {:.3f}".format(p_value))
-    plt.annotate("p = {:.3f}".format(p_value), xy=(0.05, 0.9), xycoords="axes fraction")
-
     plt.savefig(figname + ".svg", dpi=300)
 
-    figname = task + "_exp_" + "Y_hist"
+    figname = task + "_exp_" + correct + "_Y_hist"
     plot_hist_fit(figname, rad_off[1], pal[0], THRESH=THRESH)
     plot_hist_fit(figname, rad_on[1], pal[1], THRESH=THRESH)
     plt.xlabel("Y Precision")
     plt.xlim([-THRESH / 15, THRESH / 15])
-
-    bootstrap_differences = bs.bootstrap_ab(
-        np.abs(rad_off[1]),
-        np.abs(rad_on[1]),
-        stat_func=mean,
-        compare_func=bs_compare.difference,
-        num_iterations=n_samples,
-        scale_test_by=len(rad_off[0]) / len(rad_on[0]),
-        alpha=0.05,
-        return_distribution=True,
-    )
-
-    observed_difference = np.nanmean(np.abs(rad_off[1])) - np.nanmean(np.abs(rad_on[1]))
-
-    p_value = (
-        2.0
-        * min(
-            np.sum(bootstrap_differences >= observed_difference),
-            np.sum(bootstrap_differences <= observed_difference),
-        )
-        / n_samples
-    )
-
-    # print results
-    print("bootstrapped p-value: {:.3f}".format(p_value))
-    plt.annotate("p = {:.3f}".format(p_value), xy=(0.05, 0.9), xycoords="axes fraction")
-
     plt.savefig(figname + ".svg", dpi=300)
 
-    figname = task + "_exp_" + "xy_scatter"
+    figname = task + "_exp_" + correct + "_xy_scatter"
     plt.figure(figname)
     plt.scatter(rad_off[0], rad_off[1], color=pal[0], alpha=0.25)
     plt.scatter(rad_on[0], rad_on[1], color=pal[1], alpha=0.25)
     plt.xlim([-THRESH / 15, THRESH / 15])
     plt.xlabel("X Precision")
     plt.ylabel("Y Precision")
+    plt.xlim([-THRESH / 15, THRESH / 15])
+
+    cloud_off = np.vstack((rad_off[0], rad_off[1]))
+    cloud_on = np.vstack((rad_on[0], rad_on[1]))
+
+    # p_value = my_boots_compare(
+    #     np.abs(np.hstack(cloud_off)),
+    #     np.abs(np.hstack(cloud_on)),
+    #     n_samples,
+    #     statfunc=np.mean,
+    #     alternative="one-sided",
+    #     scale_test_by=len(np.hstack(cloud_off)) / len(np.hstack(cloud_on)),
+    # )
+
+    n_samples = 1000
+    p_value = my_perm_test(
+        cloud_off,
+        cloud_on,
+        n_samples,
+        statfunc=dispersion,
+        alternative="greater",
+    )
+
+    # print results
+    print("perm_test p-value: {:.3f}".format(p_value))
+    if p_value < 0.001:
+        plt.annotate(
+            "p = {:.2e}".format(p_value), xy=(0.05, 0.9), xycoords="axes fraction"
+        )
+    else:
+        plt.annotate(
+            "p = {:.3f}".format(p_value), xy=(0.05, 0.9), xycoords="axes fraction"
+        )
 
     plt.savefig(figname + ".svg", dpi=300)

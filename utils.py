@@ -103,32 +103,37 @@ def get_drift_diff(
         #     )
 
         if len(thetas_out[i_stim]) != 0:
-            radius.append(radius_out[i_stim] - radius_in[i_stim])
-            sgn = 1
-
-            if np.abs(thetas_in[i_stim][0] - thetas_cue[i_stim][0]) != 0:
+            try:
+                radius.append(radius_out[i_stim] - radius_in[i_stim])
                 sgn = -np.sign(thetas_in[i_stim][0] - thetas_cue[i_stim][0])
 
-            drift.append(
-                sgn * get_drift(thetas_out[i_stim], thetas_in[i_stim], THRESH, CUT_OFF)
-            )
+                if np.abs(thetas_in[i_stim][0] - thetas_cue[i_stim][0]) == 0:
+                    sgn = -1
 
-            diff.append(sgn * get_diff(thetas_out[i_stim], thetas_in[i_stim], THRESH))
+                if np.abs(thetas_in[i_stim][0] - thetas_cue[i_stim][0]) == np.pi:
+                    sgn = -1
 
-            cov.append(
-                get_cov(
-                    thetas_out[i_stim],
-                    thetas_in[i_stim],
-                    radius_out[i_stim],
-                    radius_in[i_stim],
-                    sgn,
-                    THRESH,
+                drift.append(
+                    sgn
+                    * get_drift(thetas_out[i_stim], thetas_in[i_stim], THRESH, CUT_OFF)
                 )
-            )
-        else:
-            radius.append(np.nan)
-            drift.append(np.nan)
-            diff.append(np.nan)
+
+                diff.append(
+                    sgn * get_diff(thetas_out[i_stim], thetas_in[i_stim], THRESH)
+                )
+
+                cov.append(
+                    get_cov(
+                        thetas_out[i_stim],
+                        thetas_in[i_stim],
+                        radius_out[i_stim],
+                        radius_in[i_stim],
+                        sgn,
+                        THRESH,
+                    )
+                )
+            except:
+                pass
 
     radius = np.hstack(radius)
     drift = np.hstack(drift)
@@ -417,8 +422,8 @@ def get_cov(theta_out, theta_in, rad_out, rad_in, sgn, THRESH=30):
 
     r, theta = carteToPolar(dx, dy)
 
-    theta = theta[np.abs(r) < THRESH]
-    r = r[np.abs(r) < THRESH]
+    theta = theta[np.abs(r) < 0.5]
+    r = r[np.abs(r) < 0.5]
 
     return [r * np.cos(theta), r * np.sin(theta)]
 

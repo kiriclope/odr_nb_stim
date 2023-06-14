@@ -1,99 +1,139 @@
 import numpy as np
-from sklearn.utils import resample
+from scipy.stats import bootstrap
 from joblib import Parallel, delayed
+from sklearn.utils import resample, shuffle
 
 import progressbar as pgb
 
-
-def bootstrap_parloop(X, statfunc):
-    np.random.seed(None)
-    # Sample (with replacement) from the given dataset
-    X_sample = resample(X.copy(), n_samples=X.shape[0])
-    # Calculate user-defined statistic and store it
-    res = statfunc(X_sample)
-
-    return res
+# from bootstrapped import bootstrap as bs
+# from bootstrapped import compare_functions as bs_compare
 
 
-def my_boots(X, n_samples=1000, statfunc=np.nanmean, n_jobs=-1, verbose=0):
-    """
-    Bootstrap the conf intervals for a given sample of a population
-    and a statistic.
-    Args:
-        dataset: A list of values, each a sample from an unknown population
-        conf: The conf value (a float between 0 and 1.0)
-        iterations: The number of iterations of resampling to perform
-        sample_size: The sample size for each of the resampled (0 to 1.0
-                     for 0 to 100% of the original data size)
-    statistic: The statistic to use. This must be a function that accepts
-                   a list of values and returns a single value.
-    Returns:
-        Returns the upper and lower values of the conf interval.
-    """
+def get_pvalue(stat, obs, n_samples, alternative="greater"):
 
-    if verbose:
-        with pgb.tqdm_joblib(
-            pgb.tqdm(desc="bootstrap", total=n_samples)
-        ) as progress_bar:
-            res = Parallel(n_jobs=n_jobs)(
-                delayed(bootstrap_parloop)(X, statfunc) for _ in range(n_samples)
-            )
+    if alternative == "greater":
+        p_value = np.sum(stat >= obs) / n_samples
+    elif alternative == "less":
+        p_value = np.sum(stat <= obs) / n_samples
     else:
-        res = Parallel(n_jobs=n_jobs)(
-            delayed(bootstrap_parloop)(X, statfunc) for _ in range(n_samples)
-        )
+        p_value = 2.0 * min(np.mean(stat >= obs), np.mean(stat <= obs))
 
-    res = np.asarray(res)
-
-    return res
+    return p_value
 
 
-def my_boots_ci(
-    X, statfunc=np.nanmean, conf=0.95, n_samples=1000, n_jobs=-1, verbose=1
+def perm_test_loop(X, Y, statfunc):
+
+    # rng = np.random.default_rng(seed=None)
+
+    # X_perm = resample(X)
+    # Y_perm = resample(Y)
+
+    XY = shuffle(np.hstack((X, Y)))
+    # rng.shuffle(XY, axis=-1)
+
+    X_perm = XY[:, : X.shape[-1]]
+    Y_perm = XY[:, X.shape[-1] :]
+
+    # print(X_perm.shape, Y_perm.shape)
+
+    stat = statfunc(X_perm) * X.shape[-1] / Y.shape[-1] - statfunc(Y_perm)
+    # stat = statfunc(X_perm) - statfunc(Y_perm)
+
+    return stat
+
+
+def my_perm_test(X, Y, n_samples=10000, statfunc=np.mean, alternative="greater"):
+
+    obs = statfunc(X) - statfunc(Y)
+
+    # with pgb.tqdm_joblib(pgb.tqdm(desc="shuffle", total=n_samples)):
+    stat = Parallel(n_jobs=-1)(
+        delayed(perm_test_loop)(X, Y, statfunc) for _ in range(n_samples)
+    )
+    stat = np.array(stat)
+    print(stat.shape)
+
+    p_value = get_pvalue(stat, obs, n_samples, alternative)
+
+    return p_value
+
+
+def my_boots_compare(
+    X,
+    Y,
+    n_samples=10000,
+    statfunc=np.mean,
+    alternative="two-sided",
+    method="BCa",
+    scale_test_by=1.0,
 ):
-    """
-    Bootstrap the conf intervals for a given sample of a population
-    and a statistic.
-    Args:
-        dataset: A list of values, each a sample from an unknown population
-        conf: The conf value (a float between 0 and 1.0)
-        iterations: The number of iterations of resampling to perform
-        sample_size: The sample size for each of the resampled (0 to 1.0
-                     for 0 to 100% of the original data size)
-    statistic: The statistic to use. This must be a function that accepts
-                   a list of values and returns a single value.
-    Returns:
-        Returns the upper and lower values of the conf interval.
-    """
 
-    if verbose:
-        with pgb.tqdm_joblib(
-            pgb.tqdm(desc="bootstrap", total=n_samples)
-        ) as progress_bar:
-            res = Parallel(n_jobs=n_jobs)(
-                delayed(bootstrap_parloop)(X, statfunc) for _ in range(n_samples)
-            )
+    observed_difference = statfunc(X) - statfunc(Y)
+
+    boots_X = bootstrap(
+        (X,),
+        statistic=statfunc,
+        n_resamples=n_samples,
+        method=method,
+        vectorized=True,
+    )
+
+    boots_Y = bootstrap(
+        (Y,),
+        statistic=statfunc,
+        n_resamples=n_samples,
+        method=method,
+        vectorized=True,
+    )
+
+    bootstrap_differences = (
+        boots_X.bootstrap_distribution * scale_test_by - boots_Y.bootstrap_distribution
+    )
+
+    # ## # use bootstrap to estimate the confidence interval using your test statistic
+    # bootstrap_differences = bs.bootstrap_ab(
+    #     X,
+    #     Y,
+    #     stat_func=mean,
+    #     compare_func=bs_compare.difference,
+    #     num_iterations=n_samples,
+    #     scale_test_by=len(X) / len(Y),
+    #     alpha=0.05,
+    #     return_distribution=True,
+    # )
+
+    # calculate p-value (one-sided right-tail)
+    if alternative == "one-sided":
+        p_value = np.sum(bootstrap_differences >= observed_difference) / n_samples
     else:
-        res = Parallel(n_jobs=n_jobs)(
-            delayed(bootstrap_parloop)(X, statfunc) for _ in range(n_samples)
+        p_value = (
+            2.0
+            * min(
+                np.sum(bootstrap_differences >= observed_difference),
+                np.sum(bootstrap_differences <= observed_difference),
+            )
+            / n_samples
         )
 
-    res = np.asarray(res)
-    # print("stats", res.shape)
+    return p_value
 
-    # Sort the array of per-sample statistics and cut off ends
-    # ostats = sorted(stats)
-    ostats = np.sort(res, axis=0)
-    mean = np.mean(ostats, axis=0)
 
-    p = (1.0 - conf) / 2.0 * 100
-    lperc = np.percentile(ostats, p, axis=0)
-    lval = mean - lperc
+def my_boots_ci(X, statfunc, n_samples=10000, method="BCa", alpha=0.05):
 
-    p = (conf + (1.0 - conf) / 2.0) * 100
-    uperc = np.percentile(ostats, p, axis=0)
-    uval = -mean + uperc
+    boots_samples = bootstrap(
+        (X,),
+        statistic=statfunc,
+        n_resamples=n_samples,
+        method=method,
+        confidence_level=1.0 - alpha,
+    )
 
-    ci = np.vstack((lval, uval)).T
+    # print(boots_samples)
 
-    return mean, ci
+    ci = [boots_samples.confidence_interval.low, boots_samples.confidence_interval.high]
+    mean_boots = np.mean(boots_samples.bootstrap_distribution)
+
+    ci[0] = mean_boots - ci[0]
+    ci[1] = ci[1] - mean_boots
+
+    return ci
