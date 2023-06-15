@@ -104,23 +104,22 @@ def get_drift_diff(
 
         if len(thetas_out[i_stim]) != 0:
             try:
+                # if 0 == 0:
                 radius.append(radius_out[i_stim] - radius_in[i_stim])
                 sgn = -np.sign(thetas_in[i_stim][0] - thetas_cue[i_stim][0])
 
                 if np.abs(thetas_in[i_stim][0] - thetas_cue[i_stim][0]) == 0:
-                    sgn = -1
+                    sgn = 1
 
                 if np.abs(thetas_in[i_stim][0] - thetas_cue[i_stim][0]) == np.pi:
-                    sgn = -1
+                    sgn = 1
 
                 drift.append(
                     sgn
                     * get_drift(thetas_out[i_stim], thetas_in[i_stim], THRESH, CUT_OFF)
                 )
 
-                diff.append(
-                    sgn * get_diff(thetas_out[i_stim], thetas_in[i_stim], THRESH)
-                )
+                diff.append(get_diff(thetas_out[i_stim], thetas_in[i_stim], THRESH))
 
                 cov.append(
                     get_cov(
@@ -140,7 +139,16 @@ def get_drift_diff(
     diff = np.hstack(diff)
     cov = np.hstack(cov)
 
-    # print("radius", radius.shape, "drift", drift.shape, "diff", diff.shape)
+    # print(
+    #     "radius",
+    #     radius.shape,
+    #     "drift",
+    #     drift.shape,
+    #     "diff",
+    #     diff.shape,
+    #     "XY",
+    #     cov.shape,
+    # )
 
     return cov, drift, diff
 
@@ -386,6 +394,7 @@ def get_drift(theta_out, theta_in, THRESH=30, CUT_OFF=[0]):
     drift *= 180 / np.pi
 
     # drift = drift[np.abs(drift) < THRESH]
+    drift[np.abs(drift) >= THRESH] *= np.nan
 
     return drift
 
@@ -401,7 +410,8 @@ def get_diff(theta_out, theta_in, THRESH=30, radius=1):
     mean_theta = stat.circmean(diff, nan_policy="omit", axis=0, high=180, low=-180)
     diff = diff - mean_theta
 
-    diff = diff[np.abs(diff) < THRESH]
+    # diff = diff[np.abs(diff) < THRESH]
+    diff[np.abs(diff) >= THRESH] *= np.nan
 
     return diff
 
@@ -422,10 +432,11 @@ def get_cov(theta_out, theta_in, rad_out, rad_in, sgn, THRESH=30):
 
     r, theta = carteToPolar(dx, dy)
 
-    theta = theta[np.abs(r) < 0.5]
-    r = r[np.abs(r) < 0.5]
+    theta[np.abs(r) >= 0.5] *= np.nan
+    r[np.abs(r) >= 0.5] *= np.nan
+    res = np.array([r * np.cos(theta), r * np.sin(theta)])
 
-    return [r * np.cos(theta), r * np.sin(theta)]
+    return res
 
 
 # return np.hstack((r * np.cos(theta), r * np.sin(theta)))
@@ -474,16 +485,45 @@ def get_drift_diff_monkey(monkey, condition, task, THRESH, CUT_OFF, IF_CORRECT):
 
     print(condition, "trial", task)
 
+    df0 = pd.DataFrame(columns=["monkey", "trial", "diff", "drift", "NB"])
+    df1 = pd.DataFrame(columns=["monkey", "trial", "diff", "drift", "NB"])
+
     if monkey == "alone":
         monkey = 0
         rad_0, drift_0, diff_0 = get_drift_diff(
             monkey, condition, task, THRESH, CUT_OFF, IF_CORRECT
         )
 
+        # df0["dX"] = rad_0[0]
+        # df0["dY"] = rad_0[1]
+
+        df0["drift"] = drift_0
+        df0["diff"] = diff_0
+
         monkey = 1
         rad_1, drift_1, diff_1 = get_drift_diff(
             monkey, condition, task, THRESH, CUT_OFF, IF_CORRECT
         )
+
+        # df1["dX"] = rad_1[0]
+        # df1["dY"] = rad_1[1]
+
+        df1["drift"] = drift_1
+        df1["diff"] = diff_1
+
+        # print(df1.shape)
+
+        df = pd.concat((df0, df1))
+
+        df["monkey"] = np.hstack((np.zeros(diff_0.shape[0]), np.ones(diff_1.shape[0])))
+        df["trial"] = task * np.hstack(
+            (np.ones(diff_0.shape[0]), np.ones(diff_1.shape[0]))
+        )
+
+        if condition == "off":
+            df["NB"] = np.hstack((np.zeros(diff_0.shape[0]), np.zeros(diff_1.shape[0])))
+        else:
+            df["NB"] = np.hstack((np.ones(diff_0.shape[0]), np.ones(diff_1.shape[0])))
 
         drift_monk = np.hstack((drift_0, drift_1))
         diff_monk = np.hstack((diff_0, diff_1))
@@ -495,4 +535,4 @@ def get_drift_diff_monkey(monkey, condition, task, THRESH, CUT_OFF, IF_CORRECT):
             monkey, condition, task, THRESH, CUT_OFF, IF_CORRECT
         )
 
-    return rad_monk, drift_monk, diff_monk
+    return rad_monk, drift_monk, diff_monk, df

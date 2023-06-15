@@ -25,10 +25,10 @@ def fit_lognorm(X):
 
 if __name__ == "__main__":
 
-    THRESH = 20
+    THRESH = 25
     IF_CORRECT = False
     cut_offs = np.array([45, 90, 180])
-    n_samples = 10000
+    n_samples = 1000
 
     monkey = "alone"
     task = "first"
@@ -67,7 +67,7 @@ if __name__ == "__main__":
         for trial in trials:
 
             try:
-                rad, drift, diff = get_drift_diff_monkey(
+                rad, drift, diff, df = get_drift_diff_monkey(
                     monkey, "off", trial, THRESH, CUT_OFF, IF_CORRECT
                 )
 
@@ -75,7 +75,7 @@ if __name__ == "__main__":
                 drift_off.append(drift)
                 diff_off.append(diff)
 
-                rad, drift, diff = get_drift_diff_monkey(
+                rad, drift, diff, df = get_drift_diff_monkey(
                     monkey, "on", trial, THRESH, CUT_OFF, IF_CORRECT
                 )
 
@@ -97,14 +97,16 @@ if __name__ == "__main__":
         mean_drift_off = np.sqrt(np.nanmean(np.array(drift_off) ** 2))
         mean_diff_off = np.nanmean(np.abs(diff_off))
 
-        ci_off = my_boots_ci(drift_off, statfunc=drift_func)
-        ci_off_2 = my_boots_ci(np.abs(diff_off), statfunc=np.mean)
+        ci_off = my_boots_ci(drift_off[~np.isnan(drift_off)], statfunc=drift_func)
+        ci_off_2 = my_boots_ci(
+            np.abs(diff_off[~np.isnan(diff_off)]), statfunc=np.nanmean
+        )
 
         mean_drift_on = np.sqrt(np.nanmean(np.array(drift_on) ** 2))
         mean_diff_on = np.nanmean(np.abs(diff_on))
 
-        ci_on = my_boots_ci(drift_on, statfunc=drift_func)
-        ci_on_2 = my_boots_ci(np.abs(diff_on), statfunc=np.mean)
+        ci_on = my_boots_ci(drift_on[~np.isnan(drift_on)], statfunc=drift_func)
+        ci_on_2 = my_boots_ci(np.abs(diff_on[~np.isnan(diff_on)]), statfunc=np.nanmean)
 
         drift_D_off.append(mean_drift_off)
         diff_D_off.append(mean_diff_off)

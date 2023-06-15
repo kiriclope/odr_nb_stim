@@ -26,7 +26,6 @@ def glm_abs_error(X_off, X_on):
     # Define your formula
     formula = "absolute_errors ~ condition"
 
-    # formula = "absolute_errors ~ OFF + ON + OFF*ON"
     # Fit the generalized linear model with Gaussian family and identity link
     model = sm.formula.ols(formula=formula, data=df).fit()
 

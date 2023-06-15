@@ -1,6 +1,8 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import scipy.stats as stat
+import pandas as pd
+import statsmodels.api as sm
 
 from bootstrap import my_boots_compare, my_perm_test
 
@@ -25,12 +27,12 @@ if __name__ == "__main__":
 
     THRESH = 20
 
-    IF_CORRECT = True
-    CUT_OFF = [0, 45, 90, 180, np.nan]
-    # CUT_OFF = [180]
+    IF_CORRECT = False
+    # CUT_OFF = [0, 45, 90, 180, np.nan]
+    CUT_OFF = [45]
 
     monkey = "alone"
-    task = "sec"
+    task = "first"
 
     if task == "first":
         trials = np.arange(1, 11)
@@ -47,10 +49,12 @@ if __name__ == "__main__":
     rad_on = []
     diff_on = []
 
+    dum = 0
     for trial in trials:
 
         try:
-            rad0, drift0, diff0 = get_drift_diff_monkey(
+            # if 0 == 0:
+            rad0, drift0, diff0, df0 = get_drift_diff_monkey(
                 monkey, "off", trial, THRESH, CUT_OFF, IF_CORRECT
             )
 
@@ -58,9 +62,15 @@ if __name__ == "__main__":
             drift_off.append(drift0)
             diff_off.append(diff0)
 
-            rad1, drift1, diff1 = get_drift_diff_monkey(
+            rad1, drift1, diff1, df1 = get_drift_diff_monkey(
                 monkey, "on", trial, THRESH, CUT_OFF, IF_CORRECT
             )
+
+            if dum == 0:
+                df = pd.concat((df0, df1))
+                dum = 1
+            else:
+                df = pd.concat((df, df0, df1))
 
             rad_on.append(rad1)
             drift_on.append(drift1)
@@ -68,6 +78,16 @@ if __name__ == "__main__":
 
         except:
             pass
+
+    formula = "diff ~ monkey + trial + NB + monkey*trial + monkey*NB + trial*NB + monkey*trial*NB"
+
+    # Fit the generalized linear model with Gaussian family and identity link
+    model = sm.formula.glm(
+        formula=formula, data=df.dropna(), family=sm.families.Gaussian()
+    ).fit()
+
+    # Print the summary of the model
+    print(model.summary())
 
     rad_off = np.hstack(rad_off)
     drift_off = np.hstack(drift_off)
