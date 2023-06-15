@@ -111,12 +111,11 @@ def get_drift_diff(
                 if np.abs(thetas_in[i_stim][0] - thetas_cue[i_stim][0]) == 0:
                     sgn = 1
 
-                if np.abs(thetas_in[i_stim][0] - thetas_cue[i_stim][0]) == np.pi:
-                    sgn = 1
+                # if np.abs(thetas_in[i_stim][0] - thetas_cue[i_stim][0]) == np.pi:
+                #     sgn = 1
 
                 drift.append(
-                    sgn
-                    * get_drift(thetas_out[i_stim], thetas_in[i_stim], THRESH, CUT_OFF)
+                    get_drift(thetas_out[i_stim], thetas_in[i_stim], THRESH, CUT_OFF)
                 )
 
                 diff.append(get_diff(thetas_out[i_stim], thetas_in[i_stim], THRESH))
@@ -481,12 +480,57 @@ def get_df(monkey, condition, task, IF_CORRECT=True):
     return df_correct
 
 
+def get_task_trial(trial):
+
+    if trial <= 10:
+        return 0
+    else:
+        return 1
+
+
+def get_distance_trial(trial):
+
+    if trial == 3 or trial == 8:
+        return 45
+
+    if trial == 2 or trial == 7:
+        return 90
+
+    if trial == 1 or trial == 6:
+        return 180
+
+    if trial == 4 or trial == 9:
+        return 0
+
+    if trial == 5 or trial == 10:  # null condition
+        return 0
+
+    if trial == 13 or trial == 18:
+        return 45
+
+    if trial == 12 or trial == 17:
+        return 90
+
+    if trial == 11 or trial == 16:
+        return 180
+
+    if trial == 14 or trial == 19:
+        return 0
+
+    if trial == 15 or trial == 20:  # null condition
+        return 0
+
+
 def get_drift_diff_monkey(monkey, condition, task, THRESH, CUT_OFF, IF_CORRECT):
 
     print(condition, "trial", task)
 
-    df0 = pd.DataFrame(columns=["monkey", "trial", "diff", "drift", "NB"])
-    df1 = pd.DataFrame(columns=["monkey", "trial", "diff", "drift", "NB"])
+    df0 = pd.DataFrame(
+        columns=["monkey", "task", "trial", "angle", "diff", "drift", "NB"]
+    )
+    df1 = pd.DataFrame(
+        columns=["monkey", "task", "trial", "angle", "diff", "drift", "NB"]
+    )
 
     if monkey == "alone":
         monkey = 0
@@ -497,8 +541,8 @@ def get_drift_diff_monkey(monkey, condition, task, THRESH, CUT_OFF, IF_CORRECT):
         # df0["dX"] = rad_0[0]
         # df0["dY"] = rad_0[1]
 
-        df0["drift"] = drift_0
-        df0["diff"] = diff_0
+        df0["drift"] = drift_0**2
+        df0["diff"] = diff_0**2
 
         monkey = 1
         rad_1, drift_1, diff_1 = get_drift_diff(
@@ -508,22 +552,32 @@ def get_drift_diff_monkey(monkey, condition, task, THRESH, CUT_OFF, IF_CORRECT):
         # df1["dX"] = rad_1[0]
         # df1["dY"] = rad_1[1]
 
-        df1["drift"] = drift_1
-        df1["diff"] = diff_1
+        df1["drift"] = drift_1**2
+        df1["diff"] = diff_1**2
 
         # print(df1.shape)
 
-        df = pd.concat((df0, df1))
+        df_ = pd.concat((df0, df1))
 
-        df["monkey"] = np.hstack((np.zeros(diff_0.shape[0]), np.ones(diff_1.shape[0])))
-        df["trial"] = task * np.hstack(
+        df_["monkey"] = np.hstack((np.zeros(diff_0.shape[0]), np.ones(diff_1.shape[0])))
+        df_["angle"] = get_distance_trial(task) * np.hstack(
+            (np.ones(diff_0.shape[0]), np.ones(diff_1.shape[0]))
+        )
+
+        df_["task"] = get_task_trial(task) * np.hstack(
+            (np.ones(diff_0.shape[0]), np.ones(diff_1.shape[0]))
+        )
+
+        df_["trial"] = task * np.hstack(
             (np.ones(diff_0.shape[0]), np.ones(diff_1.shape[0]))
         )
 
         if condition == "off":
-            df["NB"] = np.hstack((np.zeros(diff_0.shape[0]), np.zeros(diff_1.shape[0])))
+            df_["NB"] = np.hstack(
+                (np.zeros(diff_0.shape[0]), np.zeros(diff_1.shape[0]))
+            )
         else:
-            df["NB"] = np.hstack((np.ones(diff_0.shape[0]), np.ones(diff_1.shape[0])))
+            df_["NB"] = np.hstack((np.ones(diff_0.shape[0]), np.ones(diff_1.shape[0])))
 
         drift_monk = np.hstack((drift_0, drift_1))
         diff_monk = np.hstack((diff_0, diff_1))
@@ -535,4 +589,4 @@ def get_drift_diff_monkey(monkey, condition, task, THRESH, CUT_OFF, IF_CORRECT):
             monkey, condition, task, THRESH, CUT_OFF, IF_CORRECT
         )
 
-    return rad_monk, drift_monk, diff_monk, df
+    return rad_monk, drift_monk, diff_monk, df_

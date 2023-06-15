@@ -25,7 +25,7 @@ def fit_lognorm(X):
 
 if __name__ == "__main__":
 
-    THRESH = 25
+    THRESH = 30
     IF_CORRECT = False
     cut_offs = np.array([45, 90, 180])
     n_samples = 1000
@@ -88,25 +88,27 @@ if __name__ == "__main__":
 
         rad_off = np.hstack(rad_off)
         drift_off = np.hstack(drift_off)
-        diff_off = np.hstack(diff_off)
+        diff_off = np.array(np.hstack(diff_off))
 
         rad_on = np.hstack(rad_on)
         drift_on = np.hstack(drift_on)
-        diff_on = np.hstack(diff_on)
+        diff_on = np.array(np.hstack(diff_on))
 
         mean_drift_off = np.sqrt(np.nanmean(np.array(drift_off) ** 2))
-        mean_diff_off = np.nanmean(np.abs(diff_off))
+        # mean_diff_off = np.nanmean(diff_off**2)
+        mean_diff_off = np.nanstd(diff_off)
 
         ci_off = my_boots_ci(drift_off[~np.isnan(drift_off)], statfunc=drift_func)
-        ci_off_2 = my_boots_ci(
-            np.abs(diff_off[~np.isnan(diff_off)]), statfunc=np.nanmean
-        )
+        # ci_off_2 = my_boots_ci(diff_off[~np.isnan(diff_off)] ** 2, statfunc=np.nanmean)
+        ci_off_2 = my_boots_ci(diff_off[~np.isnan(diff_off)], statfunc=np.nanstd)
 
         mean_drift_on = np.sqrt(np.nanmean(np.array(drift_on) ** 2))
-        mean_diff_on = np.nanmean(np.abs(diff_on))
+        # mean_diff_on = np.nanmean(diff_on**2)
+        mean_diff_on = np.nanstd(diff_on)
 
         ci_on = my_boots_ci(drift_on[~np.isnan(drift_on)], statfunc=drift_func)
-        ci_on_2 = my_boots_ci(np.abs(diff_on[~np.isnan(diff_on)]), statfunc=np.nanmean)
+        # ci_on_2 = my_boots_ci(diff_on[~np.isnan(diff_on)] ** 2, statfunc=np.nanmean)
+        ci_on_2 = my_boots_ci(diff_on[~np.isnan(diff_on)], statfunc=np.nanstd)
 
         drift_D_off.append(mean_drift_off)
         diff_D_off.append(mean_diff_off)

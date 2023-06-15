@@ -25,14 +25,14 @@ def dispersion(x):
 
 if __name__ == "__main__":
 
-    THRESH = 20
+    THRESH = 180
 
     IF_CORRECT = False
     # CUT_OFF = [0, 45, 90, 180, np.nan]
-    CUT_OFF = [45]
+    CUT_OFF = [0, 45, 90, 180, np.nan]
 
     monkey = "alone"
-    task = "first"
+    task = "all"
 
     if task == "first":
         trials = np.arange(1, 11)
@@ -79,7 +79,14 @@ if __name__ == "__main__":
         except:
             pass
 
-    formula = "diff ~ monkey + trial + NB + monkey*trial + monkey*NB + trial*NB + monkey*trial*NB"
+    print(df.head())
+    # formula = "diff ~ monkey + trial + NB + monkey*trial + monkey*NB + trial*NB + monkey*trial*NB"
+    formula = "drift ~ NB + trial + NB * trial"
+    # formula = "drift ~ NB + trial + task + NB * trial + NB * task"
+    # formula = "drift ~ NB + task + NB * task"
+
+    # formula = "diff ~ NB + C(angle) + NB * C(angle)"
+    # formula = "drift ~ NB + C(angle) + NB * C(angle)"
 
     # Fit the generalized linear model with Gaussian family and identity link
     model = sm.formula.glm(
@@ -125,6 +132,7 @@ if __name__ == "__main__":
     print("performance", error_off * 100, error_on * 100)
 
     print("drift", np.nanmean(drift_off), np.nanmean(drift_on))
+    print("mse", np.nanmean(diff_off**2), np.nanmean(diff_on**2))
 
     ###################
     # Diffusion
@@ -136,7 +144,7 @@ if __name__ == "__main__":
     plt.xlabel("Saccadic Precision (°)")
     # plt.xlim([-THRESH, THRESH])
 
-    n_samples = 100000
+    n_samples = 1000
     p_value = my_boots_compare(
         np.abs(diff_off),
         np.abs(diff_on),
