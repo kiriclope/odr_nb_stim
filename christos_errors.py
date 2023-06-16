@@ -27,9 +27,9 @@ if __name__ == "__main__":
 
     THRESH = 180
 
-    IF_CORRECT = False
-    # CUT_OFF = [0, 45, 90, 180, np.nan]
+    IF_CORRECT = True
     CUT_OFF = [0, 45, 90, 180, np.nan]
+    # CUT_OFF = [np.nan]
 
     monkey = "alone"
     task = "all"
@@ -81,13 +81,14 @@ if __name__ == "__main__":
 
     print(df.head())
     # formula = "diff ~ monkey + trial + NB + monkey*trial + monkey*NB + trial*NB + monkey*trial*NB"
-    formula = "drift ~ NB + trial + NB * trial"
+    # formula = "diff ~ NB + trial + task + NB * trial * task"
     # formula = "drift ~ NB + trial + task + NB * trial + NB * task"
     # formula = "drift ~ NB + task + NB * task"
 
-    # formula = "diff ~ NB + C(angle) + NB * C(angle)"
+    formula = "diff ~ NB * monkey * task"
     # formula = "drift ~ NB + C(angle) + NB * C(angle)"
 
+    # df.trial = df.trial.astype("category")
     # Fit the generalized linear model with Gaussian family and identity link
     model = sm.formula.glm(
         formula=formula, data=df.dropna(), family=sm.families.Gaussian()
