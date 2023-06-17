@@ -3,7 +3,12 @@ import matplotlib.pyplot as plt
 
 
 def plot_coefs(model):
-    coef_names = ["NB:C(angle)[T.45.0]", "NB:C(angle)[T.90.0]", "NB:C(angle)[T.180.0]"]
+    coef_names = [
+        "NB:C(distance)[T.45.0]",
+        "NB:C(distance)[T.90.0]",
+        "NB:C(distance)[T.180.0]",
+    ]
+    # coef_names = ["NB:C(angle)[T.45.0]", "NB:C(angle)[T.90.0]", "NB:C(angle)[T.180.0]"]
     trial_levels = [45, 90, 135]
     # colors = ["r", "b", "g"]
 

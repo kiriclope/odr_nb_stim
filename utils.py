@@ -16,7 +16,7 @@ matplotlib.rcParams["figure.figsize"] = [width, width * golden_ratio]
 pal = [sns.color_palette("tab10")[0], sns.color_palette("tab10")[1]]
 
 
-def raw_data_to_df():
+def raw_data_to_df(THRESH=30):
 
     # NB OFF
     # monkey 0
@@ -25,6 +25,7 @@ def raw_data_to_df():
         engine="openpyxl",
         sheet_name="Inf_GruNoStim",
     )
+    df0 = classToStim(df0)
 
     df0["monkey"] = np.zeros(df0.shape[0])
     df0["NB"] = np.zeros(df0.shape[0])
@@ -46,6 +47,7 @@ def raw_data_to_df():
         engine="openpyxl",
         sheet_name="Inf_GruStim",
     )
+    df2 = classToStim(df2)
 
     df2["monkey"] = np.zeros(df2.shape[0])
     df2["NB"] = np.ones(df2.shape[0])
@@ -63,58 +65,152 @@ def raw_data_to_df():
 
     df = pd.concat([df0, df1, df2, df3], ignore_index=True)
     df = df.drop(["filename"], axis=1)
-    df = df[df.latency > 0]
+    df = df[df.latency != 0]
 
     df["radius_S1"], df["theta_S1"] = carteToPolar(df["FirstStiX"], df["FirstStiY"])
     df["radius_S2"], df["theta_S2"] = carteToPolar(df["SecondStiX"], df["SecondStiY"])
     df["radius"], df["theta"] = carteToPolar(df["endpointX"], df["endpointY"])
 
-    df["theta_S1"] *= 180 / np.pi
-    df["theta_S2"] *= 180 / np.pi
-    df["theta"] *= 180 / np.pi
-
-    df["distance"] = df["theta_S1"] - df["theta_S2"]
+    df["distance"] = np.abs(df["theta_S1"] - df["theta_S2"])
     df["error"] = np.nan * np.ones(df.shape[0])
-    df["precision"] = np.nan * np.ones(df.shape[0])
+    df["dtheta"] = np.nan * np.ones(df.shape[0])
     df["task"] = np.nan * np.ones(df.shape[0])
 
-    df.loc[df["class"] <= 10, "error"] = df["theta"] - df["theta_S1"]
-    df.loc[df["class"] > 10, "error"] = df["theta"] - df["theta_S2"]
-    # df.loc[df["class"] <= 10, "theta"] - df.loc[df["class"] <= 10, "theta_S1"]
+    df.loc[df["class"] <= 10, "task"] = 0
+    df.loc[df["class"] > 10, "task"] = 1
 
-    df.loc[df["class"] > 10]["error"] = (
+    df.loc[df["class"] <= 10, "error"] = (
+        df.loc[df["class"] <= 10, "theta"] - df.loc[df["class"] <= 10, "theta_S1"]
+    )
+
+    df.loc[df["class"] > 10, "error"] = (
         df.loc[df["class"] > 10, "theta"] - df.loc[df["class"] > 10, "theta_S2"]
     )
 
-    df.loc[df["error"] > 180, "error"] = df["error"] - 360
-    df.loc[df["error"] <= -180, "error"] = df["error"] + 360
+    df.loc[df["error"] > np.pi, "error"] = df["error"] - 2 * np.pi
+    df.loc[df["error"] <= -np.pi, "error"] = df["error"] + 2 * np.pi
+    # df.error = df.error
+
+    # df = df[np.abs(df.error) < THRESH * np.pi / 180]
 
     for session in range(1, 21):
         df_class = df[(df["class"] == session) & (df["NB"] == 0)]
 
-        class_mean = stat.circmean(
-            df_class["error"], nan_policy="omit", axis=0, high=180, low=-180
+        # class_mean = stat.circmean(
+        #     df_class["theta"], nan_policy="omit", axis=0, high=np.pi, low=-np.pi
+        # )
+
+        class_mean = df_class["error"].mean()
+
+        df.loc[(df["class"] == session) & (df["NB"] == 0), "dtheta"] = (
+            df_class["error"] - class_mean
         )
 
-        df.loc[(df["class"] == session) & (df["NB"] == 0), "precision"] = (
-            df_class["theta"] - class_mean
-        )
+        mean = df.loc[(df["class"] == session) & (df["NB"] == 0), "dtheta"].mean()
+        print(mean)
 
     for session in range(1, 21):
         df_class = df[(df["class"] == session) & (df["NB"] == 1)]
 
-        class_mean = stat.circmean(
-            df_class["error"], nan_policy="omit", axis=0, high=180, low=-180
+        # class_mean = stat.circmean(
+        #     df_class["error"], nan_policy="omit", axis=0, high=np.pi, low=-np.pi
+        # )
+
+        class_mean = df_class["error"].mean()
+
+        df.loc[(df["class"] == session) & (df["NB"] == 0), "dtheta"] = (
+            df_class["error"] - class_mean
         )
 
-        df.loc[(df["class"] == session) & (df["NB"] == 1), "precision"] = (
-            df_class["theta"] - class_mean
-        )
+    # df.loc[df["dtheta"] > np.pi, "dtheta"] = df["dtheta"] - 2 * np.pi
+    # df.loc[df["dtheta"] <= -np.pi, "dtheta"] = df["dtheta"] + 2 * np.pi
 
-    df.loc[df["precision"] > 180, "precision"] = df["precision"] - 360
-    df.loc[df["precision"] <= -180, "precision"] = df["precision"] + 360
+    df["theta_S1"] *= 180 / np.pi
+    df["theta_S2"] *= 180 / np.pi
+    df["theta"] *= 180 / np.pi
+    df["distance"] *= 180 / np.pi
+    df["error"] *= 180 / np.pi
+    df["dtheta"] *= 180 / np.pi
+
+    df["dtheta2"] = df["dtheta"] ** 2
+    df["error2"] = df["error"] ** 2
 
     return df
+
+
+def plot_error(df, task):
+
+    if task == "first":
+        idx = df["class"] <= 10
+    elif task == "sec":
+        idx = df["class"] > 10
+    elif task == "all":
+        idx = True
+    else:
+        idx = df["class"] == task
+
+    plt.hist(
+        df[(idx) & (df.NB == 0)].error,
+        bins="auto",
+        density=True,
+        histtype="step",
+    )
+    plt.hist(
+        df[(idx) & (df.NB == 1)].error,
+        bins="auto",
+        density=True,
+        histtype="step",
+    )
+
+
+def plot_dtheta(df, task, THRESH=30):
+
+    df = df[np.abs(df.dtheta) <= THRESH]
+
+    if task == "first":
+        idx = df["class"] <= 10
+    elif task == "sec":
+        idx = df["class"] > 10
+    elif task == "all":
+        idx = True
+    else:
+        idx = df["class"] == task
+
+    plt.hist(
+        df[(idx) & (df.NB == 0)].dtheta,
+        bins="auto",
+        density=True,
+        histtype="step",
+    )
+    plt.hist(
+        df[(idx) & (df.NB == 1)].dtheta,
+        bins="auto",
+        density=True,
+        histtype="step",
+    )
+
+
+def plot_latency(df, task):
+
+    # df = df[np.abs(df.dtheta) <= 20]
+
+    if task == "first":
+        idx = df["class"] <= 10
+    elif task == "sec":
+        idx = df["class"] > 10
+    elif task == "all":
+        idx = True
+    else:
+        idx = df["class"] == task
+
+    latency = []
+    distance = [0, 45, 90, 180]
+    for i in distance:
+        latency.append(
+            df[(idx) & (df.distance == i) & (df.NB == 0)].sacc_duration.mean()
+        )
+
+    plt.plot(distance, latency, "o")
 
 
 def plot_hist_fit(figname, X, pal, THRESH=30, FIT=1):
