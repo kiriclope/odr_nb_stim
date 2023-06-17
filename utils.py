@@ -16,6 +16,107 @@ matplotlib.rcParams["figure.figsize"] = [width, width * golden_ratio]
 pal = [sns.color_palette("tab10")[0], sns.color_palette("tab10")[1]]
 
 
+def raw_data_to_df():
+
+    # NB OFF
+    # monkey 0
+    df0 = pd.read_excel(
+        "./data/StimulationEyeEndPoint2.xlsx",
+        engine="openpyxl",
+        sheet_name="Inf_GruNoStim",
+    )
+
+    df0["monkey"] = np.zeros(df0.shape[0])
+    df0["NB"] = np.zeros(df0.shape[0])
+
+    df1 = pd.read_excel(
+        "./data/StimulationEyeEndPoint2.xlsx",
+        engine="openpyxl",
+        sheet_name="Inf_HecNoStim",
+    )
+    df1 = classToStim(df1)
+
+    df1["monkey"] = np.ones(df1.shape[0])
+    df1["NB"] = np.zeros(df1.shape[0])
+
+    # NB ON
+    # monkey 0
+    df2 = pd.read_excel(
+        "./data/StimulationEyeEndPoint2.xlsx",
+        engine="openpyxl",
+        sheet_name="Inf_GruStim",
+    )
+
+    df2["monkey"] = np.zeros(df2.shape[0])
+    df2["NB"] = np.ones(df2.shape[0])
+
+    # monkey 1
+    df3 = pd.read_excel(
+        "./data/StimulationEyeEndPoint2.xlsx",
+        engine="openpyxl",
+        sheet_name="Inf_HecStim",
+    )
+    df3 = classToStim(df3)
+
+    df3["monkey"] = np.ones(df3.shape[0])
+    df3["NB"] = np.ones(df3.shape[0])
+
+    df = pd.concat([df0, df1, df2, df3], ignore_index=True)
+    df = df.drop(["filename"], axis=1)
+    df = df[df.latency > 0]
+
+    df["radius_S1"], df["theta_S1"] = carteToPolar(df["FirstStiX"], df["FirstStiY"])
+    df["radius_S2"], df["theta_S2"] = carteToPolar(df["SecondStiX"], df["SecondStiY"])
+    df["radius"], df["theta"] = carteToPolar(df["endpointX"], df["endpointY"])
+
+    df["theta_S1"] *= 180 / np.pi
+    df["theta_S2"] *= 180 / np.pi
+    df["theta"] *= 180 / np.pi
+
+    df["distance"] = df["theta_S1"] - df["theta_S2"]
+    df["error"] = np.nan * np.ones(df.shape[0])
+    df["precision"] = np.nan * np.ones(df.shape[0])
+    df["task"] = np.nan * np.ones(df.shape[0])
+
+    df.loc[df["class"] <= 10, "error"] = df["theta"] - df["theta_S1"]
+    df.loc[df["class"] > 10, "error"] = df["theta"] - df["theta_S2"]
+    # df.loc[df["class"] <= 10, "theta"] - df.loc[df["class"] <= 10, "theta_S1"]
+
+    df.loc[df["class"] > 10]["error"] = (
+        df.loc[df["class"] > 10, "theta"] - df.loc[df["class"] > 10, "theta_S2"]
+    )
+
+    df.loc[df["error"] > 180, "error"] = df["error"] - 360
+    df.loc[df["error"] <= -180, "error"] = df["error"] + 360
+
+    for session in range(1, 21):
+        df_class = df[(df["class"] == session) & (df["NB"] == 0)]
+
+        class_mean = stat.circmean(
+            df_class["error"], nan_policy="omit", axis=0, high=180, low=-180
+        )
+
+        df.loc[(df["class"] == session) & (df["NB"] == 0), "precision"] = (
+            df_class["theta"] - class_mean
+        )
+
+    for session in range(1, 21):
+        df_class = df[(df["class"] == session) & (df["NB"] == 1)]
+
+        class_mean = stat.circmean(
+            df_class["error"], nan_policy="omit", axis=0, high=180, low=-180
+        )
+
+        df.loc[(df["class"] == session) & (df["NB"] == 1), "precision"] = (
+            df_class["theta"] - class_mean
+        )
+
+    df.loc[df["precision"] > 180, "precision"] = df["precision"] - 360
+    df.loc[df["precision"] <= -180, "precision"] = df["precision"] + 360
+
+    return df
+
+
 def plot_hist_fit(figname, X, pal, THRESH=30, FIT=1):
 
     plt.figure(figname)
