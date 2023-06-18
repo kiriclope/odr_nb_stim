@@ -94,6 +94,7 @@ def raw_data_to_df(THRESH=30):
     _, df["theta"] = carteToPolar(df["X"], df["Y"])
 
     df["distance"] = np.abs(df["theta_S1"] - df["theta_S2"])
+    df["sign"] = np.sign(df["theta_S1"] - df["theta_S2"])
 
     df.loc[df.theta_S1.isna(), "distance"] = -np.pi / 180
     df.loc[df.theta_S2.isna(), "distance"] = -np.pi / 180
@@ -175,6 +176,8 @@ def raw_data_to_df(THRESH=30):
     df["distance"] *= 180 / np.pi
     df["error"] *= 180 / np.pi
     df["dtheta"] *= 180 / np.pi
+
+    df.loc[df.sign != 0, "error"] *= -df.sign
 
     df["dtheta2"] = df["dtheta"] ** 2
     df["error2"] = df["error"] ** 2

@@ -27,12 +27,12 @@ if __name__ == "__main__":
 
     THRESH = 180
 
-    IF_CORRECT = True
+    IF_CORRECT = False
     CUT_OFF = [0, 45, 90, 180, np.nan]
-    # CUT_OFF = [np.nan]
+    CUT_OFF = [90]
 
     monkey = "alone"
-    task = "all"
+    task = "sec"
 
     if task == "first":
         trials = np.arange(1, 11)
@@ -41,7 +41,7 @@ if __name__ == "__main__":
     else:
         trials = np.arange(1, 21)
 
-    drift_off = []
+        drift_off = []
     rad_off = []
     diff_off = []
 
