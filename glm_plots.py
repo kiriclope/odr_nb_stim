@@ -8,7 +8,9 @@ def plot_coefs_distance(model):
         "NB:C(distance)[T.90.0]",
         "NB:C(distance)[T.180.0]",
     ]
+    # coef_names = ["NB:C(angle)[T.45.0]", "NB:C(angle)[T.90.0]", "NB:C(angle)[T.180.0]"]
     trial_levels = [45, 90, 135]
+    # colors = ["r", "b", "g"]
 
     coef_vals = [model.params[name] for name in coef_names]
     se_vals = [model.bse[name] for name in coef_names]

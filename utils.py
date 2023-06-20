@@ -7,6 +7,7 @@ import scipy.stats as stat
 import statsmodels.api as sm
 
 from bootstrap import my_boots_ci
+from glm_plots import plot_coefs_distance
 
 # from bootstrap import my_boots_compare, my_perm_test
 
@@ -19,6 +20,10 @@ width = 7.5
 matplotlib.rcParams["figure.figsize"] = [width, width * golden_ratio]
 
 pal = [sns.color_palette("tab10")[0], sns.color_palette("tab10")[1]]
+
+
+def sqrt_mean(X):
+    return np.sqrt(np.nanmean(X))
 
 
 def gaussian_fit(X, THRESH, pal):
@@ -77,7 +82,7 @@ def raw_data_to_df(THRESH=30):
 
     df = pd.concat([df0, df1, df2, df3], ignore_index=True)
     df = df.drop(["filename", "trial", "endPointTurn"], axis=1)
-    df = df[df.latency != 0]
+    df = df[df.latency > 0]
     df.latency = df.latency.abs()
 
     df = df.rename(columns={"FirstStiX": "X1"})
@@ -94,6 +99,9 @@ def raw_data_to_df(THRESH=30):
     _, df["theta"] = carteToPolar(df["X"], df["Y"])
 
     df["distance"] = np.abs(df["theta_S1"] - df["theta_S2"])
+    df.loc[df.distance.isna(), "distance"] = 0
+    # df[df.distance == np.pi / 2] = np.pi
+
     df["sign"] = np.sign(df["theta_S1"] - df["theta_S2"])
 
     df.loc[df.theta_S1.isna(), "distance"] = -np.pi / 180
@@ -128,7 +136,7 @@ def raw_data_to_df(THRESH=30):
     df.loc[df["error"] > np.pi, "error"] = df["error"] - 2 * np.pi
     df.loc[df["error"] <= -np.pi, "error"] = df["error"] + 2 * np.pi
 
-    df = df[np.abs(df.error) < THRESH * np.pi / 180]
+    # df = df[np.abs(df.error) < THRESH * np.pi / 180]
 
     for monkey in range(2):
         for NB in range(2):
@@ -140,23 +148,18 @@ def raw_data_to_df(THRESH=30):
                 ]
 
                 # class_mean = stat.circmean(
-                #     df_class["error"],
+                #     df_class[df_class.error.abs() <= THRESH * np.pi / 180.0].error,
                 #     nan_policy="omit",
                 #     axis=0,
-                #     high=2 * np.pi,
-                #     low=0,
+                #     high=np.pi,
+                #     low=-np.pi,
                 # )
 
-                # if df_class.distance.iloc[0] != 0:
-                #     class_mean = df_class[
-                #         (df_class.error.abs() <= df_class.distance.iloc[0] * 0.75)
-                #     ].error.mean()
-                # else:
-                # class_mean = df_class[
-                #     (df_class.error.abs() <= 30 * np.pi / 180.0)
-                # ].error.mean()
+                class_mean = df_class[
+                    df_class.error.abs() <= THRESH * np.pi / 180.0
+                ].error.mean()
 
-                class_mean = df_class.error.mean()
+                # # class_mean = df_class.error.mean()
 
                 df.loc[
                     (df["class"] == session)
@@ -166,6 +169,29 @@ def raw_data_to_df(THRESH=30):
                 ] = (
                     df_class["error"] - class_mean
                 )
+                class_mean = df_class.error.mean()
+
+                # class_mean = df_class.theta.mean()
+                # class_mean = stat.circmean(
+                #     df_class.theta,
+                #     nan_policy="omit",
+                #     axis=0,
+                #     high=2 * np.pi,
+                #     low=0,
+                # )
+
+                # dtheta = df_class["theta"] - class_mean
+
+                # dtheta[dtheta > np.pi] -= 2 * np.pi
+                # dtheta[dtheta <= np.pi] += 2 * np.pi
+                # dtheta = dtheta[dtheta.abs() < THRESH * np.pi / 180]
+
+                # df.loc[
+                #     (df["class"] == session)
+                #     & (df["monkey"] == monkey)
+                #     & (df["NB"] == NB),
+                #     "dtheta",
+                # ] = dtheta
 
     df.loc[df["dtheta"] > np.pi, "dtheta"] = df["dtheta"] - 2 * np.pi
     df.loc[df["dtheta"] <= -np.pi, "dtheta"] = df["dtheta"] + 2 * np.pi
@@ -177,7 +203,7 @@ def raw_data_to_df(THRESH=30):
     df["error"] *= 180 / np.pi
     df["dtheta"] *= 180 / np.pi
 
-    df.loc[df.sign != 0, "error"] *= -df.sign
+    df.loc[(~df.sign.isna()) & (df.sign != 0), "error"] *= -df.sign
 
     df["dtheta2"] = df["dtheta"] ** 2
     df["error2"] = df["error"] ** 2
@@ -185,67 +211,116 @@ def raw_data_to_df(THRESH=30):
     return df
 
 
-def glm_NB_task(df, error="dtheta"):
+def glm_NB_monkey(df, error="dtheta2", THRESH=30):
+    df2 = df[df.error.abs() <= THRESH]
+
+    if error == "dtheta":
+        formula = "dtheta2 ~ NB * monkey"
+    elif error == "dtheta2":
+        formula = "dtheta2 ~ NB * monkey"
+    elif error == "error2":
+        formula = "error2 ~ NB * monkey"
+    elif error == "error":
+        formula = "error ~ NB * monkey"
+
+    print(formula)
+    model = sm.formula.glm(
+        formula=formula, data=df2, family=sm.families.Gaussian()
+    ).fit()
+    print(model.summary())
+    return model
+
+
+def glm_NB_task(df, error="dtheta2", THRESH=30):
+    df2 = df[df.error.abs() <= THRESH]
+
     if error == "dtheta":
         formula = "dtheta2 ~ NB * task"
-    else:
+    elif error == "dtheta2":
+        formula = "dtheta2 ~ NB * task"
+    elif error == "error2":
         formula = "error2 ~ NB * task"
+    elif error == "error":
+        formula = "error ~ NB * task"
 
     print(formula)
     model = sm.formula.glm(
-        formula=formula, data=df.dropna(), family=sm.families.Gaussian()
+        formula=formula, data=df2, family=sm.families.Gaussian()
     ).fit()
     print(model.summary())
     return model
 
 
-def glm_NB_task_monkey(df, error="dtheta"):
+def glm_NB_task_monkey(df, error="dtheta2", THRESH=30):
+
+    df2 = df[df.error.abs() <= THRESH]
 
     if error == "dtheta":
+        formula = "dtheta ~ NB * task * monkey"
+    elif error == "dtheta2":
         formula = "dtheta2 ~ NB * task * monkey"
-    else:
+    elif error == "error2":
         formula = "error2 ~ NB * task * monkey"
+    elif error == "error":
+        formula = "error ~ NB * task * monkey"
 
     print(formula)
     model = sm.formula.glm(
-        formula=formula, data=df.dropna(), family=sm.families.Gaussian()
+        formula=formula, data=df2.dropna(), family=sm.families.Gaussian()
     ).fit()
     print(model.summary())
     return model
 
 
-def glm_NB_distance(df, task, error="dtheta", THRESH=180):
+def glm_NB_distance(df, task, error="dtheta2", THRESH=180):
 
-    df2 = df[(df.task == task) & (df.distance != -1) & (df.dtheta <= THRESH)]
-    print(df2.distance.unique())
-    # df2 = df[(df.task == task)]
-
-    if error == "dtheta":
+    if error == "dtheta2":
         formula = "dtheta2 ~ NB * C(distance)"
-    else:
+        idx = df.dtheta.abs() <= THRESH
+    elif error == "dtheta":
+        formula = "dtheta ~ NB * C(distance)"
+        idx = df.dtheta.abs() <= THRESH
+    elif error == "error":
+        formula = "error ~ NB * C(distance)"
+        idx = df.error.abs() <= THRESH
+    elif error == "error2":
+        idx = df.error.abs() <= THRESH
         formula = "error2 ~ NB * C(distance)"
+
+    df2 = df[(df.task == task) & (df.distance != -1) & (df.distance != 0) & idx]
 
     print(formula)
     model = sm.formula.glm(
-        formula=formula, data=df2.dropna(), family=sm.families.Gaussian()
+        formula=formula, data=df2, family=sm.families.Gaussian()
     ).fit()
+
     print(model.summary())
+
+    # plot_coefs_distance(model)
+
     return model
 
 
-def glm_NB_distance_monkey(df, task, error="dtheta", THRESH=180):
+def glm_NB_distance_monkey(df, task, error="dtheta2", THRESH=180):
 
-    df2 = df[(df.task == task) & (df.distance != -1) & (df.dtheta <= THRESH)]
-    # df2 = df[(df.task == task)]
+    if error == "dtheta2":
+        formula = "dtheta2 ~ NB * C(distance) * monkey"
+        idx = df.dtheta.abs() <= THRESH
+    elif error == "dtheta":
+        formula = "dtheta ~ NB * C(distance) * monkey"
+        idx = df.dtheta.abs() <= THRESH
+    elif error == "error":
+        formula = "error ~ NB * C(distance) * monkey"
+        idx = df.error.abs() <= THRESH
+    elif error == "error2":
+        idx = df.error.abs() <= THRESH
+        formula = "error2 ~ NB * C(distance) * monkey"
 
-    if error == "dtheta":
-        formula = "dtheta2 ~ NB * C(distance) + monkey"
-    else:
-        formula = "error2 ~ NB * C(distance)"
+    df2 = df[(df.task == task) & (df.distance != -1) & (df.distance != 0) & idx]
 
     print(formula)
     model = sm.formula.glm(
-        formula=formula, data=df2.dropna(), family=sm.families.Gaussian()
+        formula=formula, data=df2, family=sm.families.Gaussian()
     ).fit()
     print(model.summary())
     return model
@@ -253,12 +328,12 @@ def glm_NB_distance_monkey(df, task, error="dtheta", THRESH=180):
 
 def plot_error(df, task, dist, THRESH=30, bins="auto"):
 
-    dft = df[np.abs(df.error) <= THRESH]
+    dft = df[df.error.abs() <= THRESH]
 
     if task == "first":
-        idx = dft["class"] <= 10
+        idx = dft.task == 0
     elif task == "sec":
-        idx = dft["class"] > 10
+        idx = dft.task == 1
     elif task == "all":
         idx = True
     elif task in range(1, 21):
@@ -269,18 +344,35 @@ def plot_error(df, task, dist, THRESH=30, bins="auto"):
     else:
         idx1 = True
 
+    error_off = dft[(idx) & (idx1) & (dft.NB == 0)].error
+    error_on = dft[(idx) & (idx1) & (dft.NB == 1)].error
+
+    mse_off = np.sqrt(np.nanmean(error_off**2))
+    mse_on = np.sqrt(np.nanmean(error_on**2))
+
+    print("mse", mse_off, mse_on)
+
+    fig, ax = plt.subplots()
     plt.hist(
-        dft[(idx) & (idx1) & (dft.NB == 0)].error,
+        error_off,
         bins=bins,
         density=True,
         histtype="step",
+        lw=5,
+        color=pal[0],
     )
     plt.hist(
-        dft[(idx) & (idx1) & (dft.NB == 1)].error,
+        error_on,
         bins=bins,
         density=True,
         histtype="step",
+        lw=5,
+        color=pal[1],
     )
+
+    ylim = ax.get_ylim()
+    plt.vlines(np.nanmean(error_off), 0, ylim[1], color=pal[0], ls="--")
+    plt.vlines(np.nanmean(error_on), 0, ylim[1], color=pal[1], ls="--")
 
     plt.xlabel("Error (°)")
     plt.ylabel("Density")
@@ -331,7 +423,7 @@ def plot_dtheta_distance(df, task, THRESH=30):
 
 def plot_error_distance(df, task, THRESH=30):
 
-    dft = df[np.abs(df.dtheta) <= THRESH]
+    dft = df[df.error.abs() <= THRESH]
 
     if task == "first":
         idx = dft.task == 0
@@ -351,11 +443,11 @@ def plot_error_distance(df, task, THRESH=30):
         df_off = dft[(idx) & (idx1) & (dft.NB == 0)].error ** 2
         df_on = dft[(idx) & (idx1) & (dft.NB == 1)].error ** 2
 
-        std_off.append(np.nanmean(df_off))
-        std_on.append(np.nanmean(df_on))
+        std_off.append(np.sqrt(np.nanmean(df_off)))
+        std_on.append(np.sqrt(np.nanmean(df_on)))
 
-        ci_off.append(my_boots_ci(df_off, statfunc=np.nanmean))
-        ci_on.append(my_boots_ci(df_on, statfunc=np.nanmean))
+        ci_off.append(my_boots_ci(df_off, statfunc=sqrt_mean))
+        ci_on.append(my_boots_ci(df_on, statfunc=sqrt_mean))
 
     dist_list[-1] = 135
 
@@ -372,9 +464,52 @@ def plot_error_distance(df, task, THRESH=30):
     plt.savefig(figname + ".svg", dpi=300)
 
 
+def plot_dist_error_distance(df, task, THRESH=30):
+
+    dft = df[df.error.abs() <= THRESH]
+
+    if task == "first":
+        idx = dft.task == 0
+    elif task == "sec":
+        idx = dft.task == 1
+    elif task == "all":
+        idx = True
+
+    std_off, std_on = [], []
+    ci_off, ci_on = [], []
+
+    dist_list = np.array([45, 90, 180])
+
+    for distance in dist_list:
+        idx1 = dft["distance"] == distance
+
+        df_off = dft[(idx) & (idx1) & (dft.NB == 0)].error
+        df_on = dft[(idx) & (idx1) & (dft.NB == 1)].error
+
+        std_off.append(np.nanmean(df_off))
+        std_on.append(np.nanmean(df_on))
+
+        ci_off.append(my_boots_ci(df_off, statfunc=np.nanmean))
+        ci_on.append(my_boots_ci(df_on, statfunc=np.nanmean))
+
+    dist_list[-1] = 135
+
+    figname = "dist_error_distance_" + task
+    plt.figure(figname)
+    plt.plot(dist_list, std_off, "-o", color=pal[0])
+    plt.plot(dist_list + 5, std_on, "-o", color=pal[1])
+    plt.xticks([45, 90, 135], [45, 90, 180])
+    plt.xlabel("Distance btw Targets (°)")
+    plt.ylabel("Distraction Bias (°)")
+
+    plt.errorbar(dist_list, std_off, yerr=np.array(ci_off).T, color=pal[0])
+    plt.errorbar(dist_list + 5, std_on, yerr=np.array(ci_on).T, color=pal[1])
+    plt.savefig(figname + ".svg", dpi=300)
+
+
 def plot_dtheta(df, task, dist, THRESH=30, bins="auto"):
 
-    dft = df[np.abs(df.dtheta) <= THRESH]
+    dft = df[df.dtheta.abs() <= THRESH]
 
     if task == "first":
         idx = dft.task == 0
@@ -390,6 +525,7 @@ def plot_dtheta(df, task, dist, THRESH=30, bins="auto"):
     else:
         idx1 = True
 
+    plt.figure("precision_errors")
     plt.hist(
         dft[(idx) & (idx1) & (dft.NB == 0)].dtheta,
         bins=bins,
@@ -414,13 +550,15 @@ def plot_dtheta(df, task, dist, THRESH=30, bins="auto"):
 
     gaussian_fit(dft[(idx) & (idx1) & (dft.NB == 1)].dtheta, THRESH, pal[1])
 
-    plt.xlabel("Corrected Error (°)")
+    plt.xlabel("Precision Error (°)")
     plt.ylabel("Density")
+
+    plt.savefig("precision_error_" + task + ".svg", dpi=300)
 
 
 def plot_latency(df, task, THRESH=30):
 
-    dft = df[np.abs(df.dtheta) <= THRESH]
+    dft = df[df.error.abs() <= THRESH]
 
     if task == "first":
         idx = dft.task == 0
@@ -434,17 +572,26 @@ def plot_latency(df, task, THRESH=30):
     latency_off = []
     latency_on = []
 
-    distance = [-1, 0, 45, 90, 180]
+    ci_off = []
+    ci_on = []
+
+    distance = np.array([45, 90, 180])
     for i in distance:
-        latency_off.append(
-            dft[(idx) & (dft.distance == i) & (dft.NB == 0)].latency.mean()
-        )
-        latency_on.append(
-            dft[(idx) & (dft.distance == i) & (dft.NB == 1)].latency.mean()
-        )
+
+        df_off = dft[(idx) & (dft.distance == i) & (dft.NB == 0)].latency
+        df_on = dft[(idx) & (dft.distance == i) & (dft.NB == 1)].latency
+
+        latency_off.append(df_off.mean())
+        latency_on.append(df_on.mean())
+
+        ci_off.append(my_boots_ci(df_off, statfunc=np.nanmean))
+        ci_on.append(my_boots_ci(df_on, statfunc=np.nanmean))
 
     plt.plot(distance, latency_off, "o")
-    plt.plot(distance, latency_on, "o")
+    plt.plot(distance + 5, latency_on, "o")
+
+    plt.errorbar(distance, latency_off, yerr=np.array(ci_off).T, color=pal[0])
+    plt.errorbar(distance + 5, latency_on, yerr=np.array(ci_on).T, color=pal[1])
 
     plt.xlabel("Distance (°)")
     plt.ylabel("Latency (ms)")
@@ -452,7 +599,7 @@ def plot_latency(df, task, THRESH=30):
 
 def plot_saccade(df, task, THRESH=30):
 
-    dft = df[np.abs(df.dtheta) <= THRESH]
+    dft = df[df.error.abs() <= THRESH]
 
     if task == "first":
         idx = dft.task == 0
