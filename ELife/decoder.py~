@@ -1,0 +1,37 @@
+from sklearn.preprocessing import StandardScaler, RobustScaler
+from sklearn.linear_model import LogisticRegressionCV
+from sklearn.model_selection import (
+    StratifiedKFold,
+    LeaveOneOut,
+    RepeatedStratifiedKFold,
+)
+
+from sklearn.pipeline import Pipeline
+
+
+def get_pipeline(n_splits=10, penalty="l2", scoring="accuracy", scaler="standard"):
+
+    cv = StratifiedKFold(n_splits=n_splits, shuffle=True, random_state=None)
+
+    # cv = LeaveOneOut()
+
+    clf = LogisticRegressionCV(
+        solver="liblinear",
+        penalty=penalty,
+        scoring=scoring,
+        fit_intercept=True,
+        cv=cv,
+        n_jobs=None,
+        verbose=0,
+    )
+
+    pipe = []
+    if scaler == "standard":
+
+        pipe.append(("scaler", StandardScaler()))
+
+    pipe.append(("clf", clf))
+
+    pipe = Pipeline(pipe)
+
+    return pipe
