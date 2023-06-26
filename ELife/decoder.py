@@ -1,9 +1,11 @@
-from sklearn.preprocessing import StandardScaler, RobustScaler
+import numpy as np
+from sklearn.preprocessing import StandardScaler, RobustScaler, Normalizer
 from sklearn.linear_model import LogisticRegressionCV
 from sklearn.model_selection import (
     StratifiedKFold,
     LeaveOneOut,
     RepeatedStratifiedKFold,
+    cross_val_score,
 )
 
 from sklearn.pipeline import Pipeline
@@ -18,6 +20,7 @@ def get_pipeline(
         cv = LeaveOneOut()
     else:
         cv = StratifiedKFold(n_splits=n_splits, shuffle=True, random_state=None)
+        # cv = RepeatedStratifiedKFold(n_splits=n_splits, n_repeats=10, random_state=None)
 
     print(cv)
 
@@ -35,6 +38,11 @@ def get_pipeline(
     pipe = []
     if scaler == "standard":
         pipe.append(("scaler", StandardScaler()))
+    elif scaler == "center":
+        pipe.append(("scaler", StandardScaler(with_std=False)))
+    elif scaler == "norm":
+        pipe.append(("scaler", Normalizer()))
+
     pipe.append(("clf", clf))
 
     pipe = Pipeline(pipe)
@@ -43,3 +51,20 @@ def get_pipeline(
         pipe = BaggingClassifier(pipe, n_estimators=1000, n_jobs=-1)
 
     return pipe
+
+
+def get_cv_score(pipe, X, y):
+
+    cv = LeaveOneOut()
+
+    cv_scores = cross_val_score(
+        pipe,
+        X,
+        y,
+        cv=cv,
+        scoring="accuracy",
+        n_jobs=-1,
+        verbose=0,
+    )
+
+    return np.nanmean(cv_scores)

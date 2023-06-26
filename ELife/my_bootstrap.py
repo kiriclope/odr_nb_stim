@@ -117,7 +117,7 @@ def my_boots_compare(
 
 
 def my_boots_ci(
-    X, statfunc, n_samples=10000, method="BCa", alpha=0.05, vectorized=False
+    X, statfunc, n_samples=10000, method="BCa", alpha=0.05, vectorized=False, means=None
 ):
 
     boots_samples = bootstrap(
@@ -134,7 +134,12 @@ def my_boots_ci(
     ci = [boots_samples.confidence_interval.low, boots_samples.confidence_interval.high]
     mean_boots = np.mean(boots_samples.bootstrap_distribution)
 
+    # if means is None:
     ci[0] = mean_boots - ci[0]
     ci[1] = ci[1] - mean_boots
+    # else:
+    #     ci[0] = np.abs(means - ci[0])
+    #     ci[1] = np.abs(ci[1] - means)
 
+    print(ci)
     return ci
