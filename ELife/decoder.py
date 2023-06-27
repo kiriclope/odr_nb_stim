@@ -56,6 +56,7 @@ def get_pipeline(
 def get_cv_score(pipe, X, y):
 
     cv = LeaveOneOut()
+    # cv = RepeatedStratifiedKFold(n_splits=5, n_repeats=10, random_state=None)
 
     cv_scores = cross_val_score(
         pipe,

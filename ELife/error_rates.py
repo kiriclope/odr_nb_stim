@@ -48,12 +48,12 @@ def ci_student(data):
     return ci
 
 
-def norm_var(X, axis=0):
-    # X_scale = z_score(X, 1)
-    # print(X.shape, X_scale.shape)
-    # return np.nanstd(X, axis, ddof=0) / np.nanmean(X, axis)
-    # return np.nanstd(X, axis, ddof=0) / np.nanmean(X, axis)
-    return np.nanmean(X, axis)
+def norm_var(X, axis=0, IF_STD=0):
+
+    if IF_STD:
+        return np.nanstd(X, axis, ddof=0) / np.nanmean(X, axis)
+    else:
+        return np.nanmean(X, axis)
 
 
 if __name__ == "__main__":
@@ -62,19 +62,24 @@ if __name__ == "__main__":
     df = get_df(data)
 
     # df = df.dropna()
+
     # df = df[df.S1 != -1]
     df = df[df.S2 != -1]
-    # df = df[df.S2 != 2]
+    df = df[df.S2 != 2]
 
-    # df = df[df.task == 0]
-    # df["delay2_rate"] = z_score(df["delay2_rate"], axis=0)
-    # df["delay1_rate"] = z_score(df["delay1_rate"], axis=0)
-    # df["delays_rate"] = z_score(df["delays_rate"], axis=0)
+    # df[(df.S2 != 2) & (df.task == 0)] = np.nan  # remove 45 in R1
+    # df[(df.S2 != 3) & (df.task == 1)] = np.nan  # remove 90 in R2
+
+    print(np.unique(df.task))
 
     epochs = ["cue_rate", "delay1_rate", "sample_rate", "delay2_rate"]
-    epoch = "delays_rate"
+    epoch = "all_rate"
 
+    IF_STD = 0
     stim = "S1"
+
+    # idx_p = df.S1 == 1
+    # idx_np = df.S1 == 5
 
     idx_p = (df.S1 == 1) & (df.task == 0)
     idx_np = (df.S1 == 5) & (df.task == 0)
@@ -87,7 +92,7 @@ if __name__ == "__main__":
 
     df_off = df[(df.NB == 0) & idx_p]
     X_off, y_off = get_X_y(df_off, epoch, stim)
-    X_off_p = norm_var(X_off)
+    X_off_p = norm_var(X_off, IF_STD=IF_STD)
 
     ci_off_p = my_boots_ci(
         X_off_p,
@@ -103,7 +108,7 @@ if __name__ == "__main__":
 
     df_on = df[(df.NB == 1) & idx_p]
     X_on, y_on = get_X_y(df_on, epoch, stim)
-    X_on_p = norm_var(X_on)
+    X_on_p = norm_var(X_on, IF_STD=IF_STD)
 
     ci_on_p = my_boots_ci(
         X_on_p,
@@ -120,7 +125,7 @@ if __name__ == "__main__":
     df_off = df[(df.NB == 0) & idx_np]
 
     X_off, y_off = get_X_y(df_off, epoch, stim)
-    X_off_np = norm_var(X_off)
+    X_off_np = norm_var(X_off, IF_STD=IF_STD)
 
     ci_off_np = my_boots_ci(
         X_off_np,
@@ -138,7 +143,7 @@ if __name__ == "__main__":
 
     df_on = df[(df.NB == 1) & idx_np]
     X_on, y_on = get_X_y(df_on, epoch, stim)
-    X_on_np = norm_var(X_on)
+    X_on_np = norm_var(X_on, IF_STD=IF_STD)
 
     ci_on_np = my_boots_ci(
         X_on_np,
@@ -152,29 +157,42 @@ if __name__ == "__main__":
 
     # ci_on_np = ci_student(X_on_np)
 
-    plt.figure("sd")
-    plt.bar([0, 1], [np.nanmean(X_off_np), np.nanmean(X_on_np)], width=1, color=pal)
-    plt.bar([2, 3], [np.nanmean(X_off_p), np.nanmean(X_on_p)], width=1, color=pal)
+    if IF_STD:
+        plt.figure("rate_bar")
+    else:
+        plt.figure("std_bar")
+
+    plt.bar([0, 2], [np.nanmean(X_off_np), np.nanmean(X_on_np)], width=1, color=pal)
+    plt.bar([1, 3], [np.nanmean(X_off_p), np.nanmean(X_on_p)], width=1, color=pal)
 
     plt.errorbar(
         [0], np.nanmean(X_off_np), yerr=np.array(ci_off_np)[:, np.newaxis], color="k"
     )
 
     plt.errorbar(
-        [1], np.nanmean(X_on_np), yerr=np.array(ci_on_np)[:, np.newaxis], color="k"
+        [2], np.nanmean(X_on_np), yerr=np.array(ci_on_np)[:, np.newaxis], color="k"
     )
 
     plt.errorbar(
-        [2], np.nanmean(X_off_p), yerr=np.array(ci_off_p)[:, np.newaxis], color="k"
+        [1], np.nanmean(X_off_p), yerr=np.array(ci_off_p)[:, np.newaxis], color="k"
     )
 
     plt.errorbar(
         [3], np.nanmean(X_on_p), yerr=np.array(ci_on_p)[:, np.newaxis], color="k"
     )
 
-    plt.xticks([0, 1, 2, 3], ["OFF", "ON", "OFF", "ON"])
-    plt.ylim([0.8, 1.5])
-    plt.ylabel("Norm. Standard Deviation")
+    plt.xticks([0, 1, 2, 3], ["Nonpref", "Pref", "Nonpref", "Pref"])
+    plt.xlabel("Stimulus location")
+    # plt.xticks([0, 1, 2, 3], ["OFF", "ON", "OFF", "ON"])
+
+    if IF_STD:
+        plt.ylabel("Norm. Variability")
+        plt.ylim([0.8, 1.5])
+        plt.savefig("std_bar.svg", dpi=300)
+    else:
+        plt.ylabel("Mean Activity (Hz)")
+        plt.ylim([5, 15])
+        plt.savefig("mean_bar.svg", dpi=300)
 
     print("np", np.nanmean(X_off_np), np.nanmean(X_on_np))
     print("p", np.nanmean(X_off_p), np.nanmean(X_on_p))

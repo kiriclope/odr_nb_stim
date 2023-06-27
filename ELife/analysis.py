@@ -89,11 +89,14 @@ def get_df(data):
     df0 = array_to_df(delay2_rates, ["trial", "delay2_rate"])
     df["delay2_rate"] = df0["delay2_rate"]
 
-    delay_rates = delay1_rates + delay2_rates
+    delay_rates = (delay1_rates + delay2_rates) / 2.0
     df0 = array_to_df(delay_rates, ["trial", "delays_rate"])
     df["delays_rate"] = df0["delays_rate"]
 
-    all_rates = delay_rates + cue_rates + sample_rates
+    # all_rates = (delay1_rates + delay2_rates + cue_rates + sample_rates) / 4.0
+
+    all_rates = (delay1_rates + delay2_rates + cue_rates) / 3.0
+
     df0 = array_to_df(all_rates, ["trial", "all_rate"])
     df["all_rate"] = df0["all_rate"]
 
@@ -139,6 +142,11 @@ def get_X_y(df, epoch="delay2_rate", stim="S1"):
     y[y == 1] = 0
     y[y == 5] = 1
 
+    # X = X[(y == 0) | (y == 1)]
+    # y = y[(y == 0) | (y == 1)]
+
+    print("y", np.unique(y))
+    print("X", X.shape, "y", y.shape)
     return X, y
 
 
@@ -180,23 +188,24 @@ if __name__ == "__main__":
     df = get_df(data)
 
     df0 = df[df.task == 0]
-    df0 = df0[df0.S1 != -1]
-    # df0 = df0[df0.S2 != 2]
+    df0 = df0[df0.S2 != -1]
+    df0 = df0[df0.S2 != 2]
 
     df1 = df[df.task == 1]
-    df1 = df1[df1.S1 != -1]
     df1 = df1[(df1.S2 == 1) | (df1.S2 == 5)]
     df1.S1 = df1.S2
 
     n_splits = 5
     pipe = get_pipeline(n_splits, penalty="l2", scoring="accuracy", scaler=None)
 
-    epochs = ["cue_rate", "delay1_rate", "sample_rate", "delay2_rate"]
+    epochs = ["cue_rate", "delay1_rate", "delay2_rate"]
+    # epochs = ["cue_rate", "delay1_rate", "sample_rate", "delay2_rate"]
+    # epochs = ["cue_rate"]
 
     mean_scores = []
     cis = []
 
-    IF_STD = 0
+    IF_STD = 1
 
     df_task = df0
     stim = "S1"
@@ -208,6 +217,9 @@ if __name__ == "__main__":
 
         df_off = df_task[(df_task.NB == 0) & (df_task.S1 == 1)]
         X_off_p, y_off_p = get_X_y(df_off, epoch, stim)
+
+        # X_off_p = X_off_p[: X_off_np.shape[0]]
+        # y_off_p = y_off_p[: y_off_np.shape[0]]
 
         if IF_STD:
             X_off_np = np.abs(
@@ -242,6 +254,9 @@ if __name__ == "__main__":
 
         df_on = df_task[(df_task.NB == 1) & (df_task.S1 == 1)]
         X_on_p, y_on_p = get_X_y(df_on, epoch, stim)
+
+        # X_on_p = X_on_p[: X_on_np.shape[0]]
+        # y_on_p = y_on_p[: y_on_np.shape[0]]
 
         if IF_STD:
             X_on_np = np.abs(
