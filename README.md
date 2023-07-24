@@ -1,1 +1,1 @@
-# odr_nb_stim
+# Data analysis for the Nucleus Basalis paper
