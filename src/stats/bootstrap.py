@@ -1,16 +1,14 @@
 import numpy as np
-from scipy.stats import bootstrap
-from joblib import Parallel, delayed
-from sklearn.utils import resample, shuffle
-
 import progressbar as pgb
+from joblib import Parallel, delayed
+from scipy.stats import bootstrap
+from sklearn.utils import resample, shuffle
 
 # from bootstrapped import bootstrap as bs
 # from bootstrapped import compare_functions as bs_compare
 
 
 def get_pvalue(stat, obs, n_samples, alternative="greater"):
-
     if alternative == "greater":
         p_value = np.sum(stat >= obs) / n_samples
     elif alternative == "less":
@@ -22,7 +20,6 @@ def get_pvalue(stat, obs, n_samples, alternative="greater"):
 
 
 def perm_test_loop(X, Y, statfunc):
-
     # rng = np.random.default_rng(seed=None)
 
     # X_perm = resample(X)
@@ -43,7 +40,6 @@ def perm_test_loop(X, Y, statfunc):
 
 
 def my_perm_test(X, Y, n_samples=10000, statfunc=np.mean, alternative="greater"):
-
     obs = statfunc(X) - statfunc(Y)
 
     # with pgb.tqdm_joblib(pgb.tqdm(desc="shuffle", total=n_samples)):
@@ -67,7 +63,6 @@ def my_boots_compare(
     method="BCa",
     scale_test_by=1.0,
 ):
-
     observed_difference = statfunc(X) - statfunc(Y)
 
     boots_X = bootstrap(
@@ -119,7 +114,6 @@ def my_boots_compare(
 
 
 def my_boots_ci(X, statfunc, n_samples=10000, method="BCa", alpha=0.05):
-
     boots_samples = bootstrap(
         (X,),
         statistic=statfunc,
