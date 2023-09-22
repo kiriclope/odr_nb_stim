@@ -152,7 +152,7 @@
 #+begin_src ipython
   J0_list = np.arange(1, 3, .2)
   ini_list = np.arange(1, 101)
-  
+
   IF_LOAD_MAT = 0
   IF_SAVE_MAT = 1
 
@@ -164,7 +164,7 @@
 
           model = Network('config_bump.yml', 'bump_J0_%.1f_ini_%d' % (J0, ini),
                          Jab=[-J0], IF_LOAD_MAT=IF_LOAD_MAT, IF_SAVE_MAT=IF_SAVE_MAT)
-
+          
           IF_LOAD_MAT = 1
           IF_SAVE_MAT = 0
 
