@@ -42,12 +42,6 @@
   df = raw_data_to_df(THRESH=30)
 #+end_src
 
-#+RESULTS:
-: /home/leon/nb_stim_data/org/../src/utils.py:829: FutureWarning: Setting an item of incompatible dtype is deprecated and will raise in a future error of pandas. Value '8.48528137423857' has dtype incompatible with int64, please explicitly cast to a compatible dtype first.
-:   df.loc[df["class"] == i_class + 1, "SecondStiX"] = second_X[i_class]
-: /home/leon/nb_stim_data/org/../src/utils.py:830: FutureWarning: Setting an item of incompatible dtype is deprecated and will raise in a future error of pandas. Value '8.48528137423857' has dtype incompatible with int64, please explicitly cast to a compatible dtype first.
-:   df.loc[df["class"] == i_class + 1, "SecondStiY"] = second_Y[i_class]
-
 #+begin_src ipython
 a, b = plot_dtheta(df, "first", "all")
 #+end_src
@@ -150,41 +144,6 @@ a, b = plot_dtheta(df, "first", "all")
 #+begin_src ipython
   glm_NB_distance_monkey(df, 0, error="dtheta2", THRESH=30)
 #+end_src
-
-#+RESULTS:
-:RESULTS:
-#+begin_example
-  dtheta2 ~ NB * C(distance) * monkey
-                   Generalized Linear Model Regression Results                  
-  ==============================================================================
-  Dep. Variable:                dtheta2   No. Observations:                 1697
-  Model:                            GLM   Df Residuals:                     1685
-  Model Family:                Gaussian   Df Model:                           11
-  Link Function:               Identity   Scale:                          3179.3
-  Method:                          IRLS   Log-Likelihood:                -9244.6
-  Date:                Mon, 15 Jan 2024   Deviance:                   5.3572e+06
-  Time:                        17:07:23   Pearson chi2:                 5.36e+06
-  No. Iterations:                     3   Pseudo R-squ. (CS):            0.04278
-  Covariance Type:            nonrobust                                         
-  ==================================================================================================
-                                       coef    std err          z      P>|z|      [0.025      0.975]
-  --------------------------------------------------------------------------------------------------
-  Intercept                         40.2687      4.619      8.718      0.000      31.215      49.322
-  C(distance)[T.90.0]               -9.8061      6.613     -1.483      0.138     -22.767       3.155
-  C(distance)[T.180.0]             -11.4594      6.700     -1.710      0.087     -24.591       1.672
-  NB                               -17.0207      5.999     -2.837      0.005     -28.779      -5.263
-  NB:C(distance)[T.90.0]             5.9807      8.538      0.700      0.484     -10.753      22.715
-  NB:C(distance)[T.180.0]            6.2029      8.625      0.719      0.472     -10.702      23.108
-  monkey                            15.9273      6.674      2.386      0.017       2.846      29.009
-  C(distance)[T.90.0]:monkey        -7.1747      9.460     -0.758      0.448     -25.715      11.366
-  C(distance)[T.180.0]:monkey       -4.9960      9.601     -0.520      0.603     -23.814      13.822
-  NB:monkey                         15.5361     10.362      1.499      0.134      -4.773      35.845
-  NB:C(distance)[T.90.0]:monkey     -8.7637     14.464     -0.606      0.545     -37.113      19.586
-  NB:C(distance)[T.180.0]:monkey    -9.9147     14.672     -0.676      0.499     -38.672      18.843
-  ==================================================================================================
-#+end_example
-: <statsmodels.genmod.generalized_linear_model.GLMResultsWrapper at 0x7f0d7454d210>
-:END:
 
 #+begin_src ipython
 
