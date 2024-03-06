@@ -6,18 +6,18 @@ import seaborn as sns
 import scipy.stats as stat
 import statsmodels.api as sm
 
-from bootstrap import my_boots_ci
-from glm_plots import plot_coefs_distance
+from src.stats.bootstrap import my_boots_ci
+from src.errors.glm_plots import plot_coefs_distance
 
 # from bootstrap import my_boots_compare, my_perm_test
 
-sns.set_context("poster")
-sns.set_style("ticks")
-plt.rc("axes.spines", top=False, right=False)
+# sns.set_context("poster")
+# sns.set_style("ticks")
+# plt.rc("axes.spines", top=False, right=False)
 
-golden_ratio = (5**0.5 - 1) / 2
-width = 7.5
-matplotlib.rcParams["figure.figsize"] = [width, width * golden_ratio]
+# golden_ratio = (5**0.5 - 1) / 2
+# width = 7.5
+# matplotlib.rcParams["figure.figsize"] = [width, width * golden_ratio]
 
 pal = [sns.color_palette("tab10")[0], sns.color_palette("tab10")[1]]
 
@@ -30,7 +30,7 @@ def gaussian_fit(X, THRESH, pal):
     bins_fit = np.linspace(-THRESH, THRESH, 1000)
     mu_, sigma_ = stat.norm.fit(X)
     fit_ = stat.norm.pdf(bins_fit, mu_, sigma_)
-    plt.plot(bins_fit, fit_, color=pal, lw=5)
+    plt.plot(bins_fit, fit_, color=pal)
 
 
 def raw_data_to_df(THRESH=30):
@@ -38,7 +38,7 @@ def raw_data_to_df(THRESH=30):
     # NB OFF
     # monkey 0
     df0 = pd.read_excel(
-        "./data/StimulationEyeEndPoint2.xlsx",
+        "../data/StimulationEyeEndPoint2.xlsx",
         engine="openpyxl",
         sheet_name="Inf_GruNoStim",
     )
@@ -48,7 +48,7 @@ def raw_data_to_df(THRESH=30):
     df0["NB"] = np.zeros(df0.shape[0])
 
     df1 = pd.read_excel(
-        "./data/StimulationEyeEndPoint2.xlsx",
+        "../data/StimulationEyeEndPoint2.xlsx",
         engine="openpyxl",
         sheet_name="Inf_HecNoStim",
     )
@@ -60,7 +60,7 @@ def raw_data_to_df(THRESH=30):
     # NB ON
     # monkey 0
     df2 = pd.read_excel(
-        "./data/StimulationEyeEndPoint2.xlsx",
+        "../data/StimulationEyeEndPoint2.xlsx",
         engine="openpyxl",
         sheet_name="Inf_GruStim",
     )
@@ -71,7 +71,7 @@ def raw_data_to_df(THRESH=30):
 
     # monkey 1
     df3 = pd.read_excel(
-        "./data/StimulationEyeEndPoint2.xlsx",
+        "../data/StimulationEyeEndPoint2.xlsx",
         engine="openpyxl",
         sheet_name="Inf_HecStim",
     )
@@ -90,27 +90,27 @@ def raw_data_to_df(THRESH=30):
 
     df = df.rename(columns={"SecondStiX": "X2"})
     df = df.rename(columns={"SecondStiY": "Y2"})
-
+    
     df = df.rename(columns={"endpointX": "X"})
     df = df.rename(columns={"endpointY": "Y"})
 
     _, df["theta_S1"] = carteToPolar(df["X1"], df["Y1"])
     _, df["theta_S2"] = carteToPolar(df["X2"], df["Y2"])
     _, df["theta"] = carteToPolar(df["X"], df["Y"])
-
+    
     df["distance"] = np.abs(df["theta_S1"] - df["theta_S2"])
     df.loc[df.distance.isna(), "distance"] = 0
     # df[df.distance == np.pi / 2] = np.pi
-
+    
     df["sign"] = np.sign(df["theta_S1"] - df["theta_S2"])
-
+    
     df.loc[df.theta_S1.isna(), "distance"] = -np.pi / 180
     df.loc[df.theta_S2.isna(), "distance"] = -np.pi / 180
 
     df["error"] = np.nan * np.ones(df.shape[0])
     df["dtheta"] = np.nan * np.ones(df.shape[0])
     df["task"] = np.nan * np.ones(df.shape[0])
-
+    
     df.loc[df["class"] <= 10, "task"] = 0
     df.loc[df["class"] > 10, "task"] = 1
 
@@ -123,7 +123,7 @@ def raw_data_to_df(THRESH=30):
     )
 
     # print(df.error.iloc[0] == df.theta.iloc[0] - df.theta_S1.iloc[0])
-
+    
     df.loc[df["class"] > 10, "error"] = (
         df.loc[df["class"] > 10, "theta"] - df.loc[df["class"] > 10, "theta_S2"]
     )
@@ -132,12 +132,12 @@ def raw_data_to_df(THRESH=30):
     #     df[df["class"] == 12].error.iloc[0]
     #     == df[df["class"] == 12].theta.iloc[0] - df[df["class"] == 12].theta_S2.iloc[0]
     # )
-
+    
     df.loc[df["error"] > np.pi, "error"] = df["error"] - 2 * np.pi
     df.loc[df["error"] <= -np.pi, "error"] = df["error"] + 2 * np.pi
-
-    # df = df[np.abs(df.error) < THRESH * np.pi / 180]
-
+    
+    df = df[df.error.abs() <= THRESH * np.pi / 180]
+    
     for monkey in range(2):
         for NB in range(2):
             for session in range(1, 21):
@@ -146,7 +146,7 @@ def raw_data_to_df(THRESH=30):
                     & (df["monkey"] == monkey)
                     & (df["NB"] == NB)
                 ]
-
+                
                 # class_mean = stat.circmean(
                 #     df_class[df_class.error.abs() <= THRESH * np.pi / 180.0].error,
                 #     nan_policy="omit",
@@ -154,13 +154,13 @@ def raw_data_to_df(THRESH=30):
                 #     high=np.pi,
                 #     low=-np.pi,
                 # )
-
-                class_mean = df_class[
-                    df_class.error.abs() <= THRESH * np.pi / 180.0
-                ].error.mean()
-
-                # # class_mean = df_class.error.mean()
-
+                
+                # class_mean = df_class[
+                #     df_class.error.abs() <= THRESH * np.pi / 180.0
+                # ].error.mean()
+                
+                class_mean = df_class.error.mean()
+                
                 df.loc[
                     (df["class"] == session)
                     & (df["monkey"] == monkey)
@@ -169,8 +169,9 @@ def raw_data_to_df(THRESH=30):
                 ] = (
                     df_class["error"] - class_mean
                 )
+                
                 class_mean = df_class.error.mean()
-
+                
                 # class_mean = df_class.theta.mean()
                 # class_mean = stat.circmean(
                 #     df_class.theta,
@@ -192,7 +193,7 @@ def raw_data_to_df(THRESH=30):
                 #     & (df["NB"] == NB),
                 #     "dtheta",
                 # ] = dtheta
-
+    
     df.loc[df["dtheta"] > np.pi, "dtheta"] = df["dtheta"] - 2 * np.pi
     df.loc[df["dtheta"] <= -np.pi, "dtheta"] = df["dtheta"] + 2 * np.pi
 
@@ -202,12 +203,12 @@ def raw_data_to_df(THRESH=30):
     df["distance"] *= 180 / np.pi
     df["error"] *= 180 / np.pi
     df["dtheta"] *= 180 / np.pi
-
+    
     df.loc[(~df.sign.isna()) & (df.sign != 0), "error"] *= -df.sign
-
+    
     df["dtheta2"] = df["dtheta"] ** 2
     df["error2"] = df["error"] ** 2
-
+    
     return df
 
 
@@ -293,11 +294,11 @@ def glm_NB_distance(df, task, error="dtheta2", THRESH=180):
     model = sm.formula.glm(
         formula=formula, data=df2, family=sm.families.Gaussian()
     ).fit()
-
+    
     print(model.summary())
-
+    
     # plot_coefs_distance(model)
-
+    
     return model
 
 
@@ -327,9 +328,9 @@ def glm_NB_distance_monkey(df, task, error="dtheta2", THRESH=180):
 
 
 def plot_error(df, task, dist, THRESH=30, bins="auto"):
-
+    
     dft = df[df.error.abs() <= THRESH]
-
+    
     if task == "first":
         idx = dft.task == 0
     elif task == "sec":
@@ -338,20 +339,20 @@ def plot_error(df, task, dist, THRESH=30, bins="auto"):
         idx = True
     elif task in range(1, 21):
         idx = dft["class"] == task
-
+    
     if dist in [0, 45, 90, 180]:
         idx1 = dft["distance"] == dist
     else:
         idx1 = True
-
+    
     error_off = dft[(idx) & (idx1) & (dft.NB == 0)].error
     error_on = dft[(idx) & (idx1) & (dft.NB == 1)].error
-
+    
     mse_off = np.sqrt(np.nanmean(error_off**2))
     mse_on = np.sqrt(np.nanmean(error_on**2))
-
+    
     print("mse", mse_off, mse_on)
-
+    
     fig, ax = plt.subplots()
     plt.hist(
         error_off,
@@ -377,23 +378,24 @@ def plot_error(df, task, dist, THRESH=30, bins="auto"):
     plt.xlabel("Error (°)")
     plt.ylabel("Density")
 
-
+    return error_off, error_on
+    
 def plot_dtheta_distance(df, task, THRESH=30):
 
-    dft = df[np.abs(df.dtheta) <= THRESH]
-
+    dft = df[np.abs(df.error) <= THRESH]
+    
     if task == "first":
         idx = dft.task == 0
     elif task == "sec":
         idx = dft.task == 1
     elif task == "all":
         idx = True
-
+    
     std_off, std_on = [], []
     ci_off, ci_on = [], []
 
     dist_list = np.array([45, 90, 180])
-
+    
     for distance in dist_list:
         idx1 = dft["distance"] == distance
 
@@ -508,9 +510,9 @@ def plot_dist_error_distance(df, task, THRESH=30):
 
 
 def plot_dtheta(df, task, dist, THRESH=30, bins="auto"):
-
-    dft = df[df.dtheta.abs() <= THRESH]
-
+    
+    dft = df[df.error.abs() <= THRESH]
+    
     if task == "first":
         idx = dft.task == 0
     elif task == "sec":
@@ -519,12 +521,12 @@ def plot_dtheta(df, task, dist, THRESH=30, bins="auto"):
         idx = True
     elif task in range(1, 21):
         idx = dft["class"] == task
-
+    
     if dist in [-1, 0, 45, 90, 180]:
         idx1 = dft["distance"] == dist
     else:
         idx1 = True
-
+    
     plt.figure("precision_errors")
     plt.hist(
         dft[(idx) & (idx1) & (dft.NB == 0)].dtheta,
@@ -532,7 +534,6 @@ def plot_dtheta(df, task, dist, THRESH=30, bins="auto"):
         density=True,
         histtype="step",
         color=pal[0],
-        lw=5,
         alpha=0.5,
     )
 
@@ -544,16 +545,18 @@ def plot_dtheta(df, task, dist, THRESH=30, bins="auto"):
         density=True,
         histtype="step",
         color=pal[1],
-        lw=5,
         alpha=0.5,
     )
 
     gaussian_fit(dft[(idx) & (idx1) & (dft.NB == 1)].dtheta, THRESH, pal[1])
 
-    plt.xlabel("Precision Error (°)")
+    plt.xlabel("Corrected Saccade (°)")
     plt.ylabel("Density")
-
+    plt.xlim([-20, 20])
+    plt.ylim([0, .1])
     plt.savefig("precision_error_" + task + ".svg", dpi=300)
+    
+    return dft[(idx) & (idx1) & (dft.NB == 0)].dtheta, dft[(idx) & (idx1) & (dft.NB == 1)].dtheta
 
 
 def plot_latency(df, task, THRESH=30):
@@ -574,7 +577,7 @@ def plot_latency(df, task, THRESH=30):
 
     ci_off = []
     ci_on = []
-
+    
     distance = np.array([45, 90, 180])
     for i in distance:
 
@@ -1044,28 +1047,28 @@ def get_df(monkey, condition, task, IF_CORRECT=True):
     if condition == "on":
         if monkey == 1:
             df = pd.read_excel(
-                "./data/StimulationEyeEndPoint2.xlsx",
+                "../data/StimulationEyeEndPoint2.xlsx",
                 engine="openpyxl",
                 sheet_name="Inf_HecStim",
             )
             df = classToStim(df)
         else:
             df = pd.read_excel(
-                "./data/StimulationEyeEndPoint2.xlsx",
+                "../data/StimulationEyeEndPoint2.xlsx",
                 engine="openpyxl",
                 sheet_name="Inf_GruStim",
             )
     else:
         if monkey == 1:
             df = pd.read_excel(
-                "./data/StimulationEyeEndPoint2.xlsx",
+                "../data/StimulationEyeEndPoint2.xlsx",
                 engine="openpyxl",
                 sheet_name="Inf_HecNoStim",
             )
             df = classToStim(df)
         else:
             df = pd.read_excel(
-                "./data/StimulationEyeEndPoint2.xlsx",
+                "../data/StimulationEyeEndPoint2.xlsx",
                 engine="openpyxl",
                 sheet_name="Inf_GruNoStim",
             )

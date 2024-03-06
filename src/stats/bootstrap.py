@@ -1,5 +1,5 @@
 import numpy as np
-import progressbar as pgb
+import src.stats.progressbar as pgb
 from joblib import Parallel, delayed
 from scipy.stats import bootstrap
 from sklearn.utils import resample, shuffle
@@ -127,7 +127,7 @@ def my_boots_ci(X, statfunc, n_samples=10000, method="BCa", alpha=0.05):
     ci = [boots_samples.confidence_interval.low, boots_samples.confidence_interval.high]
     mean_boots = np.mean(boots_samples.bootstrap_distribution)
 
-    ci[0] = mean_boots - ci[0]
-    ci[1] = ci[1] - mean_boots
+    # ci[0] = mean_boots - ci[0]
+    # ci[1] = ci[1] - mean_boots
 
     return ci
